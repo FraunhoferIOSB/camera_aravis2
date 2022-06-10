@@ -5,18 +5,40 @@ name: CI
 
 on:
   push:
-    branches: [ main, devel ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch: # allow manually starting this workflow
 
 jobs:
-  industrial_ci:
+  industrial_ci_jammy:
     name: ROS ${{ matrix.ROS_DISTRO }} (${{ matrix.ROS_REPO }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-jammy
+    strategy:
+      fail-fast: false
+      matrix:
+        ROS_DISTRO: [ humble, rolling ]
+        ROS_REPO: [ main ]
+    env:
+      CCACHE_DIR: "${{ github.workspace }}/.ccache"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-${{github.run_id}}
+          restore-keys: |
+            ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-
+      - uses: 'ros-industrial/industrial_ci@master' # run industrial_ci
+        env: # either pass all entries explicitly
+          ROS_DISTRO: ${{ matrix.ROS_DISTRO }}
+          ROS_REPO: ${{ matrix.ROS_REPO }}
+  industrial_ci_focal:
+    name: ROS ${{ matrix.ROS_DISTRO }} (${{ matrix.ROS_REPO }})
+    runs-on: ubuntu-focal
     strategy:
       matrix:
-        ROS_DISTRO: [ galactic, rolling ]
+        ROS_DISTRO: [ galactic ]
         ROS_REPO: [ main ]
     env:
       CCACHE_DIR: "${{ github.workspace }}/.ccache"
