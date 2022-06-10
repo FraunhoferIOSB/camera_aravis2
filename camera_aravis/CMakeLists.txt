@@ -60,7 +60,7 @@ set(LIBRARIES
 add_library(${LIBRARY_NAME} SHARED
   src/camera_aravis.cpp
 )
-target_link_libraries(${LIBRARY_NAME} SYSTEM ${LIBRARIES})
+target_link_libraries(${LIBRARY_NAME} ${LIBRARIES})
 ament_target_dependencies(${LIBRARY_NAME} ${DEPENDENCIES})
 
 add_executable(${EXECUTABLE_NAME} src/main.cpp)

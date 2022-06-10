@@ -4,7 +4,7 @@
 # https://www.genicam.org
 #
 # Properties are defined in GenICam Standard Features Naming Convention (SFNC).
-# 
+#
 # Implementation of most properties is "optional".
 # If a parameter is not implemented, it should be set to NaN.
 #
