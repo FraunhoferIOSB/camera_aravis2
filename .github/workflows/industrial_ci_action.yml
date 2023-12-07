@@ -17,8 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ROS_DISTRO: [ humble, rolling ]
-        ROS_REPO: [ main ]
+        ROS_DISTRO: [ iron, rolling ]
+        ROS_REPO: [ devel, main ]
     env:
       CCACHE_DIR: "${{ github.workspace }}/.ccache"
     steps:
@@ -38,8 +38,8 @@ jobs:
     runs-on: ubuntu-focal
     strategy:
       matrix:
-        ROS_DISTRO: [ galactic ]
-        ROS_REPO: [ main ]
+        ROS_DISTRO: [ foxy ]
+        ROS_REPO: [ devel, main ]
     env:
       CCACHE_DIR: "${{ github.workspace }}/.ccache"
     steps:
