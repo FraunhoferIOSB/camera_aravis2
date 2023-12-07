@@ -1,30 +1,34 @@
+#include "camera_aravis/camera_aravis.h"
 
-
-#include "camera_aravis/camera_aravis.hpp"
-
+// Std
 #include <chrono>
 
 namespace camera_aravis
 {
-CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) : Node("camera_aravis", options), verbose_(declare_parameter<bool>("verbose", false))
+
+CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) 
+  : Node("camera_aravis", options)
+  , logger_(get_logger())
+  , verbose_(declare_parameter<bool>("verbose", false))
+  , err_()
 {
   setup_parameters();
 
   // Print out some useful info.
-  RCLCPP_INFO(get_logger(), "Attached cameras:");
+  RCLCPP_INFO(logger_, "Attached cameras:");
   arv_update_device_list();
   auto n_interfaces = arv_get_n_interfaces();
-  RCLCPP_INFO(get_logger(), "# Interfaces: %d", n_interfaces);
+  RCLCPP_INFO(logger_, "# Interfaces: %d", n_interfaces);
 
   auto n_devices = arv_get_n_devices();
-  RCLCPP_INFO(this->get_logger(), "# Devices: %d", n_devices);
+  RCLCPP_INFO(logger_, "# Devices: %d", n_devices);
   for (uint i = 0; i < n_devices; i++)
-    RCLCPP_INFO(this->get_logger(), "Device %d: %s", i, arv_get_device_id(i));
+    RCLCPP_INFO(logger_, "Device %d: %s", i, arv_get_device_id(i));
 
   if (n_devices == 0)
   {
-    RCLCPP_ERROR(this->get_logger(), "No cameras detected. Shutting down...");
-    // TODO: Shutdown?
+    RCLCPP_ERROR(logger_, "No cameras detected. Shutting down...");
+
     rclcpp::shutdown();
     return;
   }
@@ -37,32 +41,37 @@ CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) : Node("camera_ar
   {
     if (guid == "")
     {
-      RCLCPP_INFO(this->get_logger(), "Opening: (any)");
-      p_camera_ = arv_camera_new(nullptr);
+      RCLCPP_INFO(logger_, "Opening: (any)");
+      p_camera_ = arv_camera_new(nullptr, err_.ref());
     }
     else
     {
-      RCLCPP_INFO_STREAM(this->get_logger(), "Opening: " << guid);
-      p_camera_ = arv_camera_new(guid.c_str());
+      RCLCPP_INFO_STREAM(logger_, "Opening: " << guid);
+      p_camera_ = arv_camera_new(guid.c_str(), err_.ref());
     }
 
     if (!p_camera_)
     {
-      RCLCPP_WARN(this->get_logger(), "Unable to open camera. Retrying...");
+      err_.log(logger_);
+      RCLCPP_WARN(logger_, "Unable to open camera. Retrying...");
       rclcpp::sleep_for(std::chrono::seconds(1));
     }
   } while (!p_camera_);
 
   p_device_ =arv_camera_get_device(p_camera_);
-  RCLCPP_INFO(this->get_logger(), "Successfully opened: %s-%s", arv_camera_get_vendor_name(p_camera_),
-              arv_device_get_string_feature_value(p_device_, "DeviceSerialNumber"));
-
+  const char* vendor_name = arv_camera_get_vendor_name(p_camera_, nullptr);
+  const char* model_name = arv_camera_get_model_name(p_camera_, nullptr);
+  const char* device_sn = arv_camera_get_device_serial_number(p_camera_, nullptr);
+  const char* device_id = arv_camera_get_device_id(p_camera_, nullptr);
+  RCLCPP_INFO(logger_, "Successfully opened: %s-%s-%s", 
+              vendor_name, model_name, (device_sn) ? device_sn : device_id);
+  
   // See which features exist in this camera device
   discover_features();
 
    // Check the number of streams for this camera
   get_num_streams();
-  RCLCPP_INFO(get_logger(), "Supported stream channels: %i", static_cast<int>(num_streams_));
+  RCLCPP_INFO(logger_, "Supported stream channels: %i", static_cast<int>(num_streams_));
 
   auto const stream_names_ = get_parameter("channel_names").as_string_array();
   auto const pixel_formats = get_parameter("pixel_formats").as_string_array();
@@ -70,7 +79,7 @@ CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) : Node("camera_ar
   assert(stream_names_.size() == pixel_formats.size() && stream_names_.size() == calib_urls.size());
 
   // check if every stream channel has been given a channel name
-  if (stream_names_.size() < num_streams_) {
+  if (static_cast<gint>(stream_names_.size()) < num_streams_) {
     num_streams_ = stream_names_.size();
   }
 }
@@ -129,7 +138,7 @@ void CameraAravis::discover_features()
           && arv_gc_feature_node_is_implemented(fnode, NULL);
       if (verbose_)
       {
-        RCLCPP_INFO_STREAM(get_logger(), "Feature " << fname << " is " << (usable ? "usable" : "not usable") << ".");
+        RCLCPP_INFO_STREAM(logger_, "Feature " << fname << " is " << (usable ? "usable" : "not usable") << ".");
       }
       implemented_features_.emplace(fname, usable);
       //}
@@ -147,10 +156,10 @@ void CameraAravis::discover_features()
 
 void CameraAravis::get_num_streams()
 {
-  num_streams_ = arv_device_get_integer_feature_value(p_device_, "DeviceStreamChannelCount");
+  num_streams_ = arv_device_get_integer_feature_value(p_device_, "DeviceStreamChannelCount", err_.ref());
   // if this return 0, try the deprecated GevStreamChannelCount in case this is an older camera
   if (num_streams_ == 0) {
-    num_streams_ = arv_device_get_integer_feature_value(p_device_, "GevStreamChannelCount");
+    num_streams_ = arv_device_get_integer_feature_value(p_device_, "GevStreamChannelCount", err_.ref());
   }
 }
 

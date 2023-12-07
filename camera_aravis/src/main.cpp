@@ -1,5 +1,5 @@
 
-#include "camera_aravis/camera_aravis.hpp"
+#include "camera_aravis/camera_aravis.h"
 
 #include "rclcpp/rclcpp.hpp"
 
