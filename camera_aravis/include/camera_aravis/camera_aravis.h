@@ -2,11 +2,12 @@
 
 // Std
 #include <memory>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 // Aravis
-extern "C" {
+extern "C"
+{
 #include "arv.h"
 }
 
@@ -20,32 +21,66 @@ namespace camera_aravis
 {
 class CameraAravis : public rclcpp::Node
 {
-  //--- METHOD DECLARATION ---//
+    //--- METHOD DECLARATION ---//
 
-public:
-  explicit CameraAravis(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
-  ~CameraAravis() override;
+  public:
+    /**
+     * @brief Initialization constructor
+     *
+     * @param[in] options Node options.
+     */
+    explicit CameraAravis(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
-private:
-  void setup_parameters();
-  void discover_features();
-  void get_num_streams();
+    /**
+     * @brief Default destructor.
+     *
+     */
+    ~CameraAravis() override;
 
-  //--- MEMBER DECLARATION ---//
-private:
-  rclcpp::Logger logger_;
+  private:
+    /**
+     * @brief Set the up launch parameters.
+     */
+    void setup_parameters();
 
-  bool verbose_;
+    /**
+     * @brief Discover attached camera devices found by Aravis and open device specified by guid.
+     *
+     * @return True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool discover_and_open_camera_device();
 
-  GuardedGError err_;
+    /**
+     * @brief Discover features available on the camera.
+     */
+    void discover_features();
 
-  ArvCamera * p_camera_;
-  ArvDevice * p_device_;
-  gint num_streams_;
-  std::vector<ArvStream *> p_streams_;
-  std::vector<std::string> stream_names_;
+    //--- MEMBER DECLARATION ---//
+  private:
+    /// Logger object of node.
+    rclcpp::Logger logger_;
 
-  std::unordered_map<std::string, const bool> implemented_features_;
+    /// Object for accepting error from aravis functions.
+    GuardedGError err_;
+
+    /// Pointer to Aravis device.
+    ArvDevice* p_device_;
+
+    /// Pointer to Aravis camera.
+    ArvCamera* p_camera_;
+
+    /// GUID of camera.
+    std::string guid_;
+
+    gint num_streams_;
+    std::vector<ArvStream*> p_streams_;
+    std::vector<std::string> stream_names_;
+
+    /// TODO: Deprecated?
+    bool verbose_;
+
+    /// TODO: Deprecated?
+    std::unordered_map<std::string, const bool> implemented_features_;
 };
 
-}  // namespace camera_aravis
+} // namespace camera_aravis

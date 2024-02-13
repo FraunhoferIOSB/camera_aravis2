@@ -18,28 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         ROS_DISTRO: [ iron, rolling ]
-        ROS_REPO: [ devel, main ]
-    env:
-      CCACHE_DIR: "${{ github.workspace }}/.ccache"
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-${{github.run_id}}
-          restore-keys: |
-            ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-
-      - uses: 'ros-industrial/industrial_ci@master' # run industrial_ci
-        env: # either pass all entries explicitly
-          ROS_DISTRO: ${{ matrix.ROS_DISTRO }}
-          ROS_REPO: ${{ matrix.ROS_REPO }}
-  industrial_ci_focal:
-    name: ROS ${{ matrix.ROS_DISTRO }} (${{ matrix.ROS_REPO }})
-    runs-on: ubuntu-focal
-    strategy:
-      matrix:
-        ROS_DISTRO: [ foxy ]
-        ROS_REPO: [ devel, main ]
+        ROS_REPO: [ main ]
     env:
       CCACHE_DIR: "${{ github.workspace }}/.ccache"
     steps:

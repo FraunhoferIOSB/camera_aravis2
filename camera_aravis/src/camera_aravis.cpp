@@ -6,57 +6,140 @@
 namespace camera_aravis
 {
 
-CameraAravis::CameraAravis(const rclcpp::NodeOptions& options)
-    : Node("camera_aravis", options)
-    , logger_(get_logger())
-    , verbose_(declare_parameter<bool>("verbose", false))
-    , err_()
+//==================================================================================================
+CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) :
+  Node("camera_aravis", options),
+  logger_(this->get_logger()),
+  err_(),
+  p_device_(nullptr),
+  p_camera_(nullptr),
+  guid_(""),
+  verbose_(false)
 {
+    //--- setup parameters
     setup_parameters();
 
-    // Print out some useful info.
-    RCLCPP_INFO(logger_, "Attached cameras:");
-    arv_update_device_list();
-    auto n_interfaces = arv_get_n_interfaces();
-    RCLCPP_INFO(logger_, "# Interfaces: %d", n_interfaces);
-
-    auto n_devices = arv_get_n_devices();
-    RCLCPP_INFO(logger_, "# Devices: %d", n_devices);
-    for (uint i = 0; i < n_devices; i++)
-        RCLCPP_INFO(logger_, "Device %d: %s", i, arv_get_device_id(i));
-
-    if (n_devices == 0)
+    //--- open camera device
+    bool isSuccessful = discover_and_open_camera_device();
+    if (!isSuccessful)
     {
-        RCLCPP_ERROR(logger_, "No cameras detected. Shutting down...");
+        RCLCPP_FATAL(logger_, "Shutting down ...");
 
         rclcpp::shutdown();
         return;
     }
 
-    // Get the camera guid as a parameter or use the first device.
-    std::string guid = get_parameter("guid").as_string();
+    // // Check the number of streams for this camera
+    // auto const stream_names_ = get_parameter("channel_names").as_string_array();
+    // auto const pixel_formats = get_parameter("pixel_formats").as_string_array();
+    // auto const calib_urls    = get_parameter("camera_info_urls").as_string_array();
+    // assert(stream_names_.size() == pixel_formats.size() && stream_names_.size() == calib_urls.size());
 
-    // Open the camera, and set it up.
-    do
+    // // check if every stream channel has been given a channel name
+    // if (static_cast<gint>(stream_names_.size()) < num_streams_)
+    // {
+    //     num_streams_ = stream_names_.size();
+    // }
+}
+
+//==================================================================================================
+CameraAravis::~CameraAravis()
+{
+
+    g_object_unref(p_camera_);
+}
+
+//==================================================================================================
+void CameraAravis::setup_parameters()
+{
+    auto guid_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    guid_desc.description = "Serial number of camera that is to be opened.";
+    declare_parameter<std::string>("guid", "", guid_desc);
+
+    auto stream_count_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    stream_count_desc.description = "Number of streams supported by the camera. Default: 1";
+    declare_parameter<int>("stream_count", 1, stream_count_desc);
+
+    auto stream_names_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    stream_names_desc.description = "[Optional] String list of names that are to be "
+                                    "associated with each stream. If 'stream_count' is not set or "
+                                    "set to 1, list can be empty. Otherwise, list must have the "
+                                    "length of 'stream_count'. List is truncated to size of "
+                                    "'stream_count' if too long.";
+    declare_parameter<std::vector<std::string>>("stream_names", std::vector<std::string>({""}),
+                                                stream_names_desc);
+
+    auto pixel_formats_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    pixel_formats_desc.description = "String list of pixel formats associated with each "
+                                     "stream. List must have the length of 'stream_count'. List is "
+                                     "truncated to size of 'stream_count' if too long.";
+    declare_parameter<std::vector<std::string>>("pixel_formats", std::vector<std::string>({""}),
+                                                pixel_formats_desc);
+
+    auto camera_info_urls_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    camera_info_urls_desc.description = "String list of urls to camera_info files associated with "
+                                        "each stream. List must have the length of 'stream_count'. "
+                                        "List is truncated to size of 'stream_count' if too long.";
+    declare_parameter<std::vector<std::string>>("camera_info_urls", std::vector<std::string>({""}),
+                                                camera_info_urls_desc);
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraAravis::discover_and_open_camera_device()
+{
+    //--- Discover available interfaces and devices.
+
+    arv_update_device_list();
+    auto n_interfaces = arv_get_n_interfaces();
+    auto n_devices    = arv_get_n_devices();
+
+    RCLCPP_INFO(logger_, "Attached cameras:");
+    RCLCPP_INFO(logger_, "\t# Interfaces: %d", n_interfaces);
+    RCLCPP_INFO(logger_, "\t# Devices: %d", n_devices);
+    for (uint i = 0; i < n_devices; i++)
+        RCLCPP_INFO(logger_, "\tDevice %d: %s", i, arv_get_device_id(i));
+
+    if (n_devices == 0)
     {
-        if (guid == "")
+        RCLCPP_FATAL(logger_, "No cameras detected.");
+        return false;
+    }
+
+    //--- connect to camera specified by guid parameter
+    guid_ = get_parameter("guid").as_string();
+
+    const int MAX_RETRIES = 10;
+    int tryCount          = 1;
+    while (!p_camera_ && tryCount <= MAX_RETRIES)
+    {
+        if (guid_ == "")
         {
+            RCLCPP_WARN(logger_, "No guid specified.");
             RCLCPP_INFO(logger_, "Opening: (any)");
             p_camera_ = arv_camera_new(nullptr, err_.ref());
         }
         else
         {
-            RCLCPP_INFO_STREAM(logger_, "Opening: " << guid);
-            p_camera_ = arv_camera_new(guid.c_str(), err_.ref());
+            RCLCPP_INFO_STREAM(logger_, "Opening: " << guid_);
+            p_camera_ = arv_camera_new(guid_.c_str(), err_.ref());
         }
 
         if (!p_camera_)
         {
-            err_.log(logger_);
-            RCLCPP_WARN(logger_, "Unable to open camera. Retrying...");
+            if (err_)
+                err_.log(logger_);
+            RCLCPP_WARN(logger_, "Unable to open camera. Retrying (%i/%i) ...",
+                        tryCount, MAX_RETRIES);
             rclcpp::sleep_for(std::chrono::seconds(1));
+            tryCount++;
         }
-    } while (!p_camera_);
+    }
+
+    if (!p_camera_)
+    {
+        RCLCPP_FATAL(logger_, "Failed to open any camera.");
+        return false;
+    }
 
     p_device_               = arv_camera_get_device(p_camera_);
     const char* vendor_name = arv_camera_get_vendor_name(p_camera_, nullptr);
@@ -66,35 +149,10 @@ CameraAravis::CameraAravis(const rclcpp::NodeOptions& options)
     RCLCPP_INFO(logger_, "Successfully opened: %s-%s-%s",
                 vendor_name, model_name, (device_sn) ? device_sn : device_id);
 
-    // See which features exist in this camera device
-    discover_features();
-
-    // Check the number of streams for this camera
-    get_num_streams();
-    RCLCPP_INFO(logger_, "Supported stream channels: %i", static_cast<int>(num_streams_));
-
-    auto const stream_names_ = get_parameter("channel_names").as_string_array();
-    auto const pixel_formats = get_parameter("pixel_formats").as_string_array();
-    auto const calib_urls    = get_parameter("camera_info_urls").as_string_array();
-    assert(stream_names_.size() == pixel_formats.size() && stream_names_.size() == calib_urls.size());
-
-    // check if every stream channel has been given a channel name
-    if (static_cast<gint>(stream_names_.size()) < num_streams_)
-    {
-        num_streams_ = stream_names_.size();
-    }
+    return true;
 }
 
-CameraAravis::~CameraAravis() = default;
-
-void CameraAravis::setup_parameters()
-{
-    declare_parameter<std::string>("guid", "");
-    declare_parameter<std::vector<std::string>>("channel_names", std::vector<std::string>({""}));
-    declare_parameter<std::vector<std::string>>("pixel_formats", std::vector<std::string>({""}));
-    declare_parameter<std::vector<std::string>>("camera_info_urls", std::vector<std::string>({""}));
-}
-
+//==================================================================================================
 void CameraAravis::discover_features()
 {
     implemented_features_.clear();
@@ -151,16 +209,6 @@ void CameraAravis::discover_features()
         {
             todo.push_front(arv_dom_node_list_get_item(children, i));
         }
-    }
-}
-
-void CameraAravis::get_num_streams()
-{
-    num_streams_ = arv_device_get_integer_feature_value(p_device_, "DeviceStreamChannelCount", err_.ref());
-    // if this return 0, try the deprecated GevStreamChannelCount in case this is an older camera
-    if (num_streams_ == 0)
-    {
-        num_streams_ = arv_device_get_integer_feature_value(p_device_, "GevStreamChannelCount", err_.ref());
     }
 }
 

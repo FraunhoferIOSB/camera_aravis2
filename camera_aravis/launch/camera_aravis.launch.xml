@@ -1,8 +1,0 @@
-<launch>
-  <node pkg="camera_aravis" exec="camera_aravis" name="sim">
-    <param name="guid" value=""/>
-    <param name="channel_names" value=[""]/>
-    <param name="pixel_formats" value=[""]/>
-    <param name="camera_info_urls" value=[""]/>
-  </node>
-</launch>
