@@ -1,4 +1,27 @@
-#include "camera_aravis/camera_aravis.h"
+/****************************************************************************
+ *
+ * camera_aravis
+ *
+ * Copyright © 2024 Fraunhofer IOSB and contributors
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Library General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
+ *
+ * You should have received a copy of the GNU Library General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA  02110-1301, USA.
+ *
+ ****************************************************************************/
+
+#include "../include/camera_aravis/camera_aravis.h"
 
 // Std
 #include <chrono>
@@ -29,17 +52,8 @@ CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) :
         return;
     }
 
-    // // Check the number of streams for this camera
-    // auto const stream_names_ = get_parameter("channel_names").as_string_array();
-    // auto const pixel_formats = get_parameter("pixel_formats").as_string_array();
-    // auto const calib_urls    = get_parameter("camera_info_urls").as_string_array();
-    // assert(stream_names_.size() == pixel_formats.size() && stream_names_.size() == calib_urls.size());
-
-    // // check if every stream channel has been given a channel name
-    // if (static_cast<gint>(stream_names_.size()) < num_streams_)
-    // {
-    //     num_streams_ = stream_names_.size();
-    // }
+    //--- initialize stream list
+    initialize_camera_streams();
 }
 
 //==================================================================================================
@@ -153,6 +167,44 @@ void CameraAravis::setup_parameters()
 }
 
 //==================================================================================================
+void CameraAravis::initialize_camera_streams()
+{
+    //--- get number of streams and associated names
+
+    int num_streams   = get_parameter("stream_count").as_int();
+    auto stream_names = get_parameter("stream_names").as_string_array();
+    num_streams       = std::max(1, num_streams);
+
+    //--- check if given name list corresponds to stream count
+
+    if (static_cast<int>(stream_names.size()) != num_streams)
+    {
+        RCLCPP_WARN(logger_, "Size of 'stream_names' does not correspond 'num_streams'.");
+
+        if (static_cast<int>(stream_names.size()) < num_streams)
+        {
+            num_streams = stream_names.size();
+            RCLCPP_WARN(logger_,
+                        "Only spawning %i stream(s) (length of 'steam_names').",
+                        num_streams);
+        }
+        else
+        {
+            stream_names.resize(num_streams);
+            RCLCPP_WARN(logger_,
+                        "Truncating 'stream_names' to %i elements.",
+                        static_cast<int>(stream_names.size()));
+        }
+    }
+
+    //--- initialize stream list
+    for (uint i = 0; i < stream_names.size(); ++i)
+    {
+        streams_.push_back({nullptr, CameraBufferPool::SharedPtr(), stream_names[i]});
+    }
+}
+
+//==================================================================================================
 void CameraAravis::discover_features()
 {
     implemented_features_.clear();
@@ -210,6 +262,113 @@ void CameraAravis::discover_features()
             todo.push_front(arv_dom_node_list_get_item(children, i));
         }
     }
+}
+
+//==================================================================================================
+void CameraAravis::spawn_camera_streams()
+{
+    // GuardedGError error;
+
+    // for (int i = 0; i < num_streams_.size(); i++)
+    // {
+    //     while (is_spawning_)
+    //     {
+    //         Stream& stream = streams_[i];
+
+    //         if (arv_camera_is_gv_device(p_camera_))
+    //             aravis::camera::gv::select_stream_channel(p_camera_, i);
+
+    //         stream.p_stream = aravis::camera::create_stream(p_camera_, NULL, NULL);
+    //         if (stream.p_stream)
+    //         {
+    //             // Load up some buffers.
+    //             if (arv_camera_is_gv_device(p_camera_))
+    //                 aravis::camera::gv::select_stream_channel(p_camera_, i);
+
+    //             const gint n_bytes_payload_stream_ = aravis::camera::get_payload(p_camera_);
+
+    //             stream.p_buffer_pool.reset(new CameraBufferPool(stream.p_stream, n_bytes_payload_stream_, 10));
+
+    //             for (int j = 0; j < stream.substreams.size(); ++j)
+    //             {
+    //                 // create non-aravis buffer pools for multipart part part images recycling
+    //                 stream.substreams[j].p_buffer_pool.reset(new CameraBufferPool(nullptr, 0, 0));
+    //                 // start substream processing threads
+    //                 stream.substreams[j].buffer_thread = std::thread(&CameraAravisNodelet::substreamThreadMain, this, i, j);
+    //             }
+
+    //             if (arv_camera_is_gv_device(p_camera_))
+    //                 tuneGvStream(reinterpret_cast<ArvGvStream*>(stream.p_stream));
+
+    //             break;
+    //         }
+    //         else
+    //         {
+    //             ROS_WARN("Stream %i: Could not create image stream for %s.  Retrying...", i, guid_.c_str());
+    //             ros::Duration(1.0).sleep();
+    //             ros::spinOnce();
+    //         }
+    //     }
+    // }
+
+    // // Monitor whether anyone is subscribed to the camera stream
+    // std::vector<image_transport::SubscriberStatusCallback> image_cbs_;
+    // std::vector<ros::SubscriberStatusCallback> info_cbs_;
+
+    // image_transport::SubscriberStatusCallback image_cb = [this](const image_transport::SingleSubscriberPublisher& ssp)
+    // { this->rosConnectCallback(); };
+    // ros::SubscriberStatusCallback info_cb = [this](const ros::SingleSubscriberPublisher& ssp)
+    // { this->rosConnectCallback(); };
+
+    // for (int i = 0; i < streams_.size(); i++)
+    // {
+    //     for (int j = 0; j < streams_[i].substreams.size(); ++j)
+    //     {
+    //         image_transport::ImageTransport* p_transport;
+    //         const Substream& sub = streams_[i].substreams[j];
+
+    //         // Set up image_raw
+    //         std::string topic_name = this->getName();
+    //         p_transport            = new image_transport::ImageTransport(pnh);
+    //         if (streams_.size() != 1 || streams_[i].substreams.size() != 1 || !sub.name.empty())
+    //         {
+    //             topic_name += "/" + sub.name;
+    //         }
+
+    //         streams_[i].substreams[j].cam_pub = p_transport->advertiseCamera(
+    //           ros::names::remap(topic_name + "/image_raw"),
+    //           1, image_cb, image_cb, info_cb, info_cb);
+    //     }
+    // }
+
+    // // Connect signals with callbacks.
+    // for (int i = 0; i < streams_.size(); i++)
+    // {
+    //     StreamIdData* data = new StreamIdData();
+    //     data->can          = this;
+    //     data->stream_id    = i;
+    //     g_signal_connect(streams_[i].p_stream, "new-buffer", (GCallback)CameraAravisNodelet::newBufferReadyCallback, data);
+    // }
+    // g_signal_connect(p_device_, "control-lost", (GCallback)CameraAravisNodelet::controlLostCallback, this);
+
+    // for (int i = 0; i < streams_.size(); i++)
+    // {
+    //     arv_stream_set_emit_signals(streams_[i].p_stream, TRUE);
+    // }
+
+    // // any substream of any stream enabled?
+    // if (std::any_of(streams_.begin(), streams_.end(),
+    //                 [](const Stream& src)
+    //                 {
+    //                     return std::any_of(src.substreams.begin(), src.substreams.end(),
+    //                                        [](const Substream& sub)
+    //                                        {
+    //                                            return sub.cam_pub.getNumSubscribers() > 0;
+    //                                        });
+    //                 }))
+    // {
+    //     aravis::camera::start_acquisition(p_camera_);
+    // }
 }
 
 } // end namespace camera_aravis

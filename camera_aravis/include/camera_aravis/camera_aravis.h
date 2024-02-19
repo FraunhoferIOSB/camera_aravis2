@@ -1,4 +1,28 @@
-#pragma once
+/****************************************************************************
+ *
+ * camera_aravis
+ *
+ * Copyright © 2024 Fraunhofer IOSB and contributors
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Library General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
+ *
+ * You should have received a copy of the GNU Library General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA  02110-1301, USA.
+ *
+ ****************************************************************************/
+
+#ifndef CAMERA_ARAVIS_CAMERA_ARAVIS
+#define CAMERA_ARAVIS_CAMERA_ARAVIS
 
 // Std
 #include <memory>
@@ -15,12 +39,31 @@ extern "C"
 #include "rclcpp/rclcpp.hpp"
 
 // camera_aravis
+#include "camera_buffer_pool.h"
 #include "error.hpp"
 
 namespace camera_aravis
 {
 class CameraAravis : public rclcpp::Node
 {
+    //--- STRUCT DECLARATION ---//
+
+    /**
+     * @brief Struct implementing camera stream.
+     * Consisting of pointer to aravis stream and a associated buffer pool.
+     */
+    struct Stream
+    {
+        /// Pointer to aravis stream.
+        ArvStream* p_stream;
+
+        /// Shared pointer to buffer pool.
+        CameraBufferPool::SharedPtr p_buffer_pool;
+
+        /// Name of stream.
+        std::string name;
+    };
+
     //--- METHOD DECLARATION ---//
 
   public:
@@ -51,9 +94,19 @@ class CameraAravis : public rclcpp::Node
     [[nodiscard]] bool discover_and_open_camera_device();
 
     /**
+     * @brief Initialize camera stream. Get number of streams available, and initialize structs.
+     */
+    void initialize_camera_streams();
+
+    /**
      * @brief Discover features available on the camera.
      */
     void discover_features();
+
+    /**
+     * @brief Spawn camera streams.
+     */
+    void spawn_camera_streams();
 
     //--- MEMBER DECLARATION ---//
   private:
@@ -72,9 +125,14 @@ class CameraAravis : public rclcpp::Node
     /// GUID of camera.
     std::string guid_;
 
-    gint num_streams_;
-    std::vector<ArvStream*> p_streams_;
-    std::vector<std::string> stream_names_;
+    /// List of camera streams
+    std::vector<Stream> streams_;
+
+    /// Atomic flag, indicating if streams are being spawned.
+    std::atomic<bool> is_spawning_;
+
+    /// Thread in which the streams are spawned.
+    std::thread spawn_stream_thread_;
 
     /// TODO: Deprecated?
     bool verbose_;
@@ -84,3 +142,5 @@ class CameraAravis : public rclcpp::Node
 };
 
 } // namespace camera_aravis
+
+#endif // CAMERA_ARAVIS_CAMERA_ARAVIS

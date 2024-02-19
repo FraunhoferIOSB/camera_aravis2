@@ -31,6 +31,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(camera_aravis_msgs REQUIRED)
 
 find_package(Aravis REQUIRED)
@@ -48,6 +49,7 @@ set(DEPENDENCIES
   rclcpp
   rclcpp_components
   std_msgs
+  sensor_msgs
 )
 
 set(LIBRARIES
