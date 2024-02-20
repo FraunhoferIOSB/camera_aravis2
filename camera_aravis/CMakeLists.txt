@@ -61,6 +61,7 @@ set(LIBRARIES
 
 add_library(${LIBRARY_NAME} SHARED
   src/camera_aravis.cpp
+  src/camera_buffer_pool.cpp
 )
 target_link_libraries(${LIBRARY_NAME} ${LIBRARIES})
 ament_target_dependencies(${LIBRARY_NAME} ${DEPENDENCIES})

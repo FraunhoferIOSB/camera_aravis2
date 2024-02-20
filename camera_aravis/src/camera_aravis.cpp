@@ -25,6 +25,16 @@
 
 // Std
 #include <chrono>
+#include <iostream>
+#include <thread>
+
+// Macro to assert success of given function
+#define ASSERT_SUCCESS(fn)  \
+    if (!fn)                \
+    {                       \
+        rclcpp::shutdown(); \
+        return;             \
+    }
 
 namespace camera_aravis
 {
@@ -33,33 +43,60 @@ namespace camera_aravis
 CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) :
   Node("camera_aravis", options),
   logger_(this->get_logger()),
-  err_(),
   p_device_(nullptr),
   p_camera_(nullptr),
   guid_(""),
+  is_spawning_(false),
   verbose_(false)
 {
     //--- setup parameters
     setup_parameters();
 
     //--- open camera device
-    bool isSuccessful = discover_and_open_camera_device();
-    if (!isSuccessful)
-    {
-        RCLCPP_FATAL(logger_, "Shutting down ...");
-
-        rclcpp::shutdown();
-        return;
-    }
+    ASSERT_SUCCESS(discover_and_open_camera_device());
 
     //--- initialize stream list
-    initialize_camera_streams();
+    ASSERT_SUCCESS(initialize_camera_streams());
+
+    //--- spawn camera stream in thread, so that initialization is not blocked
+    is_spawning_         = true;
+    spawn_stream_thread_ = std::thread(&CameraAravis::spawn_camera_streams, this);
 }
 
 //==================================================================================================
 CameraAravis::~CameraAravis()
 {
+    RCLCPP_INFO(logger_, "Shutting down ...");
 
+    // Guarded error object
+    GuardedGError err;
+
+    //--- stop acquisition
+    if (p_device_)
+    {
+        arv_device_execute_command(p_device_, "AcquisitionStop", err.ref());
+        CHECK_GERROR(err, logger_);
+    }
+
+    //--- stop emitting signals for streams
+    for (uint i = 0; i < streams_.size(); i++)
+        if (streams_[i].p_arv_stream)
+            arv_stream_set_emit_signals(streams_[i].p_arv_stream, FALSE);
+
+    //--- join spawning thread
+    is_spawning_ = false;
+    if (spawn_stream_thread_.joinable())
+        spawn_stream_thread_.join();
+
+    //--- print stream statistics
+    printStreamStatistics();
+
+    //--- unref pointers
+    for (uint i = 0; i < streams_.size(); i++)
+    {
+        if (streams_[i].p_arv_stream)
+            g_object_unref(streams_[i].p_arv_stream);
+    }
     g_object_unref(p_camera_);
 }
 
@@ -101,6 +138,9 @@ void CameraAravis::setup_parameters()
 //==================================================================================================
 [[nodiscard]] bool CameraAravis::discover_and_open_camera_device()
 {
+    // Guarded error object
+    GuardedGError err;
+
     //--- Discover available interfaces and devices.
 
     arv_update_device_list();
@@ -108,8 +148,8 @@ void CameraAravis::setup_parameters()
     auto n_devices    = arv_get_n_devices();
 
     RCLCPP_INFO(logger_, "Attached cameras:");
-    RCLCPP_INFO(logger_, "\t# Interfaces: %d", n_interfaces);
-    RCLCPP_INFO(logger_, "\t# Devices: %d", n_devices);
+    RCLCPP_INFO(logger_, "\tNum. Interfaces: %d", n_interfaces);
+    RCLCPP_INFO(logger_, "\tNum. Devices: %d", n_devices);
     for (uint i = 0; i < n_devices; i++)
         RCLCPP_INFO(logger_, "\tDevice %d: %s", i, arv_get_device_id(i));
 
@@ -130,18 +170,17 @@ void CameraAravis::setup_parameters()
         {
             RCLCPP_WARN(logger_, "No guid specified.");
             RCLCPP_INFO(logger_, "Opening: (any)");
-            p_camera_ = arv_camera_new(nullptr, err_.ref());
+            p_camera_ = arv_camera_new(nullptr, err.ref());
         }
         else
         {
-            RCLCPP_INFO_STREAM(logger_, "Opening: " << guid_);
-            p_camera_ = arv_camera_new(guid_.c_str(), err_.ref());
+            RCLCPP_INFO(logger_, "Opening: %s ", guid_.c_str());
+            p_camera_ = arv_camera_new(guid_.c_str(), err.ref());
         }
 
         if (!p_camera_)
         {
-            if (err_)
-                err_.log(logger_);
+            CHECK_GERROR(err, logger_);
             RCLCPP_WARN(logger_, "Unable to open camera. Retrying (%i/%i) ...",
                         tryCount, MAX_RETRIES);
             rclcpp::sleep_for(std::chrono::seconds(1));
@@ -155,19 +194,24 @@ void CameraAravis::setup_parameters()
         return false;
     }
 
-    p_device_               = arv_camera_get_device(p_camera_);
-    const char* vendor_name = arv_camera_get_vendor_name(p_camera_, nullptr);
-    const char* model_name  = arv_camera_get_model_name(p_camera_, nullptr);
-    const char* device_sn   = arv_camera_get_device_serial_number(p_camera_, nullptr);
-    const char* device_id   = arv_camera_get_device_id(p_camera_, nullptr);
-    RCLCPP_INFO(logger_, "Successfully opened: %s-%s-%s",
-                vendor_name, model_name, (device_sn) ? device_sn : device_id);
+    //--- check if GEV Device.
+    // TODO: Remove, when USB Devices are supported.
+    if (!arv_camera_is_gv_device(p_camera_))
+    {
+        RCLCPP_FATAL(logger_, "Camera is no GEV Device.");
+        RCLCPP_FATAL(logger_, "USB3 Devices are currently not supported.");
+        RCLCPP_FATAL(logger_, "Help Wanted: https://github.com/FraunhoferIOSB/camera_aravis2/issues/14");
+        return false;
+    }
+
+    //--- connect control-lost signal
+    g_signal_connect(p_device_, "control-lost", (GCallback)CameraAravis::handleControlLost, this);
 
     return true;
 }
 
 //==================================================================================================
-void CameraAravis::initialize_camera_streams()
+bool CameraAravis::initialize_camera_streams()
 {
     //--- get number of streams and associated names
 
@@ -202,6 +246,15 @@ void CameraAravis::initialize_camera_streams()
     {
         streams_.push_back({nullptr, CameraBufferPool::SharedPtr(), stream_names[i]});
     }
+
+    //--- check if at least one stream was initialized
+    if (streams_.empty())
+    {
+        RCLCPP_FATAL(logger_, "Something went wrong in the initialization of the camera streams.");
+        return false;
+    }
+
+    return true;
 }
 
 //==================================================================================================
@@ -267,49 +320,68 @@ void CameraAravis::discover_features()
 //==================================================================================================
 void CameraAravis::spawn_camera_streams()
 {
-    // GuardedGError error;
+    GuardedGError err;
 
-    // for (int i = 0; i < num_streams_.size(); i++)
-    // {
-    //     while (is_spawning_)
-    //     {
-    //         Stream& stream = streams_[i];
+    // Number of opened streams
+    int num_opened_streams = 0;
 
-    //         if (arv_camera_is_gv_device(p_camera_))
-    //             aravis::camera::gv::select_stream_channel(p_camera_, i);
+    for (uint i = 0; i < streams_.size(); i++)
+    {
+        RCLCPP_INFO(logger_, "Spawning camera stream with ID %i", i);
 
-    //         stream.p_stream = aravis::camera::create_stream(p_camera_, NULL, NULL);
-    //         if (stream.p_stream)
-    //         {
-    //             // Load up some buffers.
-    //             if (arv_camera_is_gv_device(p_camera_))
-    //                 aravis::camera::gv::select_stream_channel(p_camera_, i);
+        Stream& stream = streams_[i];
 
-    //             const gint n_bytes_payload_stream_ = aravis::camera::get_payload(p_camera_);
+        const int MAX_RETRIES = 60;
+        int tryCount          = 1;
+        while (is_spawning_ && tryCount <= MAX_RETRIES)
+        {
 
-    //             stream.p_buffer_pool.reset(new CameraBufferPool(stream.p_stream, n_bytes_payload_stream_, 10));
+            arv_camera_gv_select_stream_channel(p_camera_, i, err.ref());
+            stream.p_arv_stream = arv_camera_create_stream(p_camera_, nullptr, nullptr, err.ref());
+            CHECK_GERROR(err, logger_);
 
-    //             for (int j = 0; j < stream.substreams.size(); ++j)
-    //             {
-    //                 // create non-aravis buffer pools for multipart part part images recycling
-    //                 stream.substreams[j].p_buffer_pool.reset(new CameraBufferPool(nullptr, 0, 0));
-    //                 // start substream processing threads
-    //                 stream.substreams[j].buffer_thread = std::thread(&CameraAravisNodelet::substreamThreadMain, this, i, j);
-    //             }
+            if (stream.p_arv_stream)
+            {
+                //--- Initialize buffers
 
-    //             if (arv_camera_is_gv_device(p_camera_))
-    //                 tuneGvStream(reinterpret_cast<ArvGvStream*>(stream.p_stream));
+                // stream payload size in bytes
+                const auto STREAM_PAYLOAD_SIZE = arv_camera_get_payload(p_camera_, err.ref());
+                CHECK_GERROR(err, logger_);
 
-    //             break;
-    //         }
-    //         else
-    //         {
-    //             ROS_WARN("Stream %i: Could not create image stream for %s.  Retrying...", i, guid_.c_str());
-    //             ros::Duration(1.0).sleep();
-    //             ros::spinOnce();
-    //         }
-    //     }
-    // }
+                // TODO: launch parameter for number of preallocated buffers
+                stream.p_buffer_pool.reset(
+                  new CameraBufferPool(logger_, stream.p_arv_stream,
+                                       static_cast<guint>(STREAM_PAYLOAD_SIZE), 10));
+
+                tuneGvStream(reinterpret_cast<ArvGvStream*>(stream.p_arv_stream));
+
+                num_opened_streams++;
+                break;
+            }
+            else
+            {
+                RCLCPP_WARN(logger_, "%s: Could not create image stream with ID %i. "
+                                     "Retrying (%i/%i) ...",
+                            guid_.c_str(), i, tryCount, MAX_RETRIES);
+                rclcpp::sleep_for(std::chrono::seconds(1));
+                tryCount++;
+            }
+        }
+
+        //--- check if stream could be established
+        if (!stream.p_arv_stream)
+            RCLCPP_ERROR(logger_, "%s: Could not create image stream with ID %i.",
+                         guid_.c_str(), i);
+    }
+    is_spawning_ = false;
+
+    //--- if no streams are opened, shut down
+    if (num_opened_streams == 0)
+    {
+        RCLCPP_FATAL(logger_, "camera_aravis failed to open streams for camera %s.",
+                     guid_.c_str());
+        ASSERT_SUCCESS(false);
+    }
 
     // // Monitor whether anyone is subscribed to the camera stream
     // std::vector<image_transport::SubscriberStatusCallback> image_cbs_;
@@ -341,20 +413,20 @@ void CameraAravis::spawn_camera_streams()
     //     }
     // }
 
-    // // Connect signals with callbacks.
-    // for (int i = 0; i < streams_.size(); i++)
-    // {
-    //     StreamIdData* data = new StreamIdData();
-    //     data->can          = this;
-    //     data->stream_id    = i;
-    //     g_signal_connect(streams_[i].p_stream, "new-buffer", (GCallback)CameraAravisNodelet::newBufferReadyCallback, data);
-    // }
-    // g_signal_connect(p_device_, "control-lost", (GCallback)CameraAravisNodelet::controlLostCallback, this);
+    //--- Connect signals with callbacks and activate emission of signals
+    for (Stream stream : streams_)
+    {
+        if (!stream.p_arv_stream)
+            continue;
+        // StreamIdData* data = new StreamIdData();
+        // data->can          = this;
+        // data->stream_id    = i;
 
-    // for (int i = 0; i < streams_.size(); i++)
-    // {
-    //     arv_stream_set_emit_signals(streams_[i].p_stream, TRUE);
-    // }
+        g_signal_connect(stream.p_arv_stream, "new-buffer",
+                         (GCallback)CameraAravis::handleNewBufferReady, nullptr);
+
+        arv_stream_set_emit_signals(stream.p_arv_stream, TRUE);
+    }
 
     // // any substream of any stream enabled?
     // if (std::any_of(streams_.begin(), streams_.end(),
@@ -367,8 +439,112 @@ void CameraAravis::spawn_camera_streams()
     //                                        });
     //                 }))
     // {
-    //     aravis::camera::start_acquisition(p_camera_);
+    arv_camera_start_acquisition(p_camera_, err.ref());
+    CHECK_GERROR(err, logger_);
     // }
+
+    //--- print final output message
+    p_device_               = arv_camera_get_device(p_camera_);
+    const char* vendor_name = arv_camera_get_vendor_name(p_camera_, nullptr);
+    const char* model_name  = arv_camera_get_model_name(p_camera_, nullptr);
+    const char* device_sn   = arv_camera_get_device_serial_number(p_camera_, nullptr);
+    const char* device_id   = arv_camera_get_device_id(p_camera_, nullptr);
+
+    RCLCPP_INFO(logger_, "Done initializing camera_aravis.");
+    RCLCPP_INFO(logger_, "\tCamera: %s-%s-%s",
+                vendor_name, model_name, (device_sn) ? device_sn : device_id);
+    RCLCPP_INFO(logger_, "\tNum. Streams: (%i / %i)",
+                num_opened_streams, static_cast<int>(streams_.size()));
+}
+
+//==================================================================================================
+void CameraAravis::tuneGvStream(ArvGvStream* p_stream) const
+{
+    if (!p_stream)
+        return;
+
+    gboolean b_auto_buffer               = FALSE;
+    gboolean b_packet_resend             = TRUE;
+    unsigned int timeout_packet          = 40; // milliseconds
+    unsigned int timeout_frame_retention = 200;
+
+    if (!ARV_IS_GV_STREAM(p_stream))
+    {
+        RCLCPP_ERROR(logger_, "Stream is not a GV_STREAM");
+        return;
+    }
+
+    if (b_auto_buffer)
+        g_object_set(p_stream, "socket-buffer",
+                     ARV_GV_STREAM_SOCKET_BUFFER_AUTO,
+                     "socket-buffer-size", 0,
+                     NULL);
+    if (!b_packet_resend)
+        g_object_set(p_stream, "packet-resend",
+                     b_packet_resend
+                       ? ARV_GV_STREAM_PACKET_RESEND_ALWAYS
+                       : ARV_GV_STREAM_PACKET_RESEND_NEVER,
+                     NULL);
+    g_object_set(p_stream, "packet-timeout",
+                 timeout_packet * 1000,
+                 "frame-retention", timeout_frame_retention * 1000,
+                 NULL);
+}
+
+//==================================================================================================
+void CameraAravis::printStreamStatistics() const
+{
+    for (uint i = 0; i < streams_.size(); i++)
+    {
+        const Stream& STREAM = streams_[i];
+
+        if (!STREAM.p_arv_stream)
+            continue;
+
+        guint64 n_completed_buffers = 0;
+        guint64 n_failures          = 0;
+        guint64 n_underruns         = 0;
+        arv_stream_get_statistics(STREAM.p_arv_stream,
+                                  &n_completed_buffers, &n_failures, &n_underruns);
+
+        RCLCPP_INFO(logger_, "Statistics for stream %i:", i);
+        RCLCPP_INFO(logger_, "\tCompleted buffers = %lli", (unsigned long long)n_completed_buffers);
+        RCLCPP_INFO(logger_, "\tFailures          = %lli", (unsigned long long)n_failures);
+        RCLCPP_INFO(logger_, "\tUnderruns         = %lli", (unsigned long long)n_underruns);
+
+        if (arv_camera_is_gv_device(p_camera_))
+        {
+            guint64 n_resent;
+            guint64 n_missing;
+
+            arv_gv_stream_get_statistics(reinterpret_cast<ArvGvStream*>(STREAM.p_arv_stream),
+                                         &n_resent, &n_missing);
+            RCLCPP_INFO(logger_, "\tResent buffers    = %lli", (unsigned long long)n_resent);
+            RCLCPP_INFO(logger_, "\tMissing           = %lli", (unsigned long long)n_missing);
+        }
+    }
+}
+
+//==================================================================================================
+void CameraAravis::handleControlLost(ArvDevice* p_device, gpointer p_user_data)
+{
+    RCL_UNUSED(p_device);
+
+    CameraAravis* p_ca_instance = (CameraAravis*)p_user_data;
+
+    if (!p_ca_instance)
+        return;
+
+    RCLCPP_FATAL(p_ca_instance->logger_, "Control to aravis device lost.");
+    RCLCPP_FATAL(p_ca_instance->logger_, "\tGUID: %s", p_ca_instance->guid_.c_str());
+
+    rclcpp::shutdown();
+}
+
+//==================================================================================================
+void CameraAravis::handleNewBufferReady(ArvStream* p_stream, gpointer p_user_data)
+{
+    std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 } // end namespace camera_aravis

@@ -33,6 +33,23 @@
 // ROS
 #include "rclcpp/rclcpp.hpp"
 
+/// Macro to assert success and log GError if necessary
+#define ASSERT_GERROR(err, logger, success) \
+    if (err)                                \
+    {                                       \
+        success = false;                    \
+        err.log(logger);                    \
+    }                                       \
+    else                                    \
+    {                                       \
+        success = true;                     \
+    }
+
+/// Macro to check if error occurred and log if necessary
+#define CHECK_GERROR(err, logger) \
+    if (err)                      \
+        err.log(logger);
+
 namespace camera_aravis
 {
 

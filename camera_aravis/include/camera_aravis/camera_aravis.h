@@ -55,7 +55,7 @@ class CameraAravis : public rclcpp::Node
     struct Stream
     {
         /// Pointer to aravis stream.
-        ArvStream* p_stream;
+        ArvStream* p_arv_stream;
 
         /// Shared pointer to buffer pool.
         CameraBufferPool::SharedPtr p_buffer_pool;
@@ -95,8 +95,10 @@ class CameraAravis : public rclcpp::Node
 
     /**
      * @brief Initialize camera stream. Get number of streams available, and initialize structs.
+     *
+     * @return True if successful. False, otherwise.
      */
-    void initialize_camera_streams();
+    [[nodiscard]] bool initialize_camera_streams();
 
     /**
      * @brief Discover features available on the camera.
@@ -108,13 +110,41 @@ class CameraAravis : public rclcpp::Node
      */
     void spawn_camera_streams();
 
+    /**
+     * @brief Tune specific parameters for GigEVision streams.
+     *
+     * @param[in] p_stream Pointer to Aravis Gv stream.
+     */
+    void tuneGvStream(ArvGvStream* p_stream) const;
+
+    /**
+     * @brief Print stream statistics, such as completed and failed buffers.
+     */
+    void printStreamStatistics() const;
+
+    //--- FUNCTION DECLARATION ---//
+
+  protected:
+    /**
+     * @brief Handle 'control-lost' signal emitted by aravis.
+     *
+     * @param[in] p_device Pointer to aravis device.
+     * @param[in] p_user_data Pointer to associated user data.
+     */
+    static void handleControlLost(ArvDevice* p_device, gpointer p_user_data);
+
+    /**
+     * @brief Handle 'new-buffer' signal emitted by aravis, notifying that a new buffer is ready.
+     *
+     * @param[in] p_device Pointer to aravis device.
+     * @param[in] p_user_data Pointer to associated user data.
+     */
+    static void handleNewBufferReady(ArvStream* p_stream, gpointer p_user_data);
+
     //--- MEMBER DECLARATION ---//
   private:
     /// Logger object of node.
     rclcpp::Logger logger_;
-
-    /// Object for accepting error from aravis functions.
-    GuardedGError err_;
 
     /// Pointer to Aravis device.
     ArvDevice* p_device_;

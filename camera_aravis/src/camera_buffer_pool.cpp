@@ -37,7 +37,7 @@ CameraBufferPool::CameraBufferPool(const rclcpp::Logger& logger,
   stream_(stream),
   payload_size_bytes_(payload_size_bytes),
   n_buffers_(0),
-  self_(this, [](CameraBufferPool* p) {}),
+  self_(this, [](CameraBufferPool*) {}),
   logger_(logger)
 {
     allocateBuffers(n_preallocated_buffers);
