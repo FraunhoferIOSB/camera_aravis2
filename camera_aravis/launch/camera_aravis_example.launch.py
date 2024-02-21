@@ -16,6 +16,7 @@ def generate_launch_description():
         executable="camera_aravis",
         output='screen',
         emulate_tty=True,
+        # arguments=['--ros-args', '--log-level', 'debug'],
         parameters=[
             {"guid": "Allied Vision-Alvium G1-240c-05P3C"}
             ]
