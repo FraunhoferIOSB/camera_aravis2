@@ -28,6 +28,7 @@
 #include <functional>
 
 // ROS
+#include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
 namespace camera_aravis

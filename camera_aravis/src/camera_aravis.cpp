@@ -34,11 +34,17 @@
 // #define MULTITHREAD_INSPECTION
 
 // Macro to assert success of given function
-#define ASSERT_SUCCESS(fn)  \
-    if (!fn)                \
-    {                       \
-        rclcpp::shutdown(); \
-        return;             \
+#define ASSERT_SUCCESS(fn) \
+    if (!fn)               \
+    {                      \
+        return;            \
+    }
+// Macro to assert success of given function and shut down if not successful
+#define ASSERT_SUCCESS_AND_SHUTDOWN(fn) \
+    if (!fn)                            \
+    {                                   \
+        rclcpp::shutdown();             \
+        return;                         \
     }
 
 namespace camera_aravis
@@ -47,11 +53,13 @@ namespace camera_aravis
 //==================================================================================================
 CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) :
   Node("camera_aravis", options),
+  is_initialized_(false),
   logger_(this->get_logger()),
   p_device_(nullptr),
   p_camera_(nullptr),
   guid_(""),
   is_spawning_(false),
+  use_ptp_timestamp_(false),
   verbose_(false)
 {
 #ifdef MULTITHREAD_INSPECTION
@@ -108,7 +116,7 @@ CameraAravis::~CameraAravis()
     }
 
     //--- print stream statistics
-    printStreamStatistics();
+    print_stream_statistics();
 
     //--- unref pointers
     for (uint i = 0; i < streams_.size(); i++)
@@ -120,38 +128,49 @@ CameraAravis::~CameraAravis()
 }
 
 //==================================================================================================
+bool CameraAravis::is_initialized() const
+{
+    return is_initialized_;
+}
+
+//==================================================================================================
 void CameraAravis::setup_parameters()
 {
     auto guid_desc        = rcl_interfaces::msg::ParameterDescriptor{};
     guid_desc.description = "Serial number of camera that is to be opened.";
     declare_parameter<std::string>("guid", "", guid_desc);
 
-    auto stream_count_desc        = rcl_interfaces::msg::ParameterDescriptor{};
-    stream_count_desc.description = "Number of streams supported by the camera. Default: 1";
-    declare_parameter<int>("stream_count", 1, stream_count_desc);
-
     auto stream_names_desc        = rcl_interfaces::msg::ParameterDescriptor{};
-    stream_names_desc.description = "[Optional] String list of names that are to be "
-                                    "associated with each stream. If 'stream_count' is not set or "
-                                    "set to 1, list can be empty. Otherwise, list must have the "
-                                    "length of 'stream_count'. List is truncated to size of "
-                                    "'stream_count' if too long.";
-    declare_parameter<std::vector<std::string>>("stream_names", std::vector<std::string>({""}),
+    stream_names_desc.description = "Optional string list of names that are to be "
+                                    "associated with each stream. If multiple steams are available "
+                                    "but no names are given, each stream will get given a name "
+                                    "based on its ID, starting with 0.";
+    declare_parameter<std::vector<std::string>>("stream_names", std::vector<std::string>({}),
                                                 stream_names_desc);
 
     auto pixel_formats_desc        = rcl_interfaces::msg::ParameterDescriptor{};
     pixel_formats_desc.description = "String list of pixel formats associated with each "
-                                     "stream. List must have the length of 'stream_count'. List is "
-                                     "truncated to size of 'stream_count' if too long.";
-    declare_parameter<std::vector<std::string>>("pixel_formats", std::vector<std::string>({""}),
+                                     "stream. List must have the same length as 'camera_info_urls'. "
+                                     "If both lists have different lengths, they are truncated to "
+                                     "the size of the shorter one.";
+    declare_parameter<std::vector<std::string>>("pixel_formats", std::vector<std::string>({}),
                                                 pixel_formats_desc);
 
     auto camera_info_urls_desc        = rcl_interfaces::msg::ParameterDescriptor{};
     camera_info_urls_desc.description = "String list of urls to camera_info files associated with "
-                                        "each stream. List must have the length of 'stream_count'. "
-                                        "List is truncated to size of 'stream_count' if too long.";
-    declare_parameter<std::vector<std::string>>("camera_info_urls", std::vector<std::string>({""}),
+                                        "each stream. List must have the same length as "
+                                        "'pixel_formats'. If both lists have different lengths, "
+                                        "they are truncated to the size of the shorter one.";
+    declare_parameter<std::vector<std::string>>("camera_info_urls", std::vector<std::string>({}),
                                                 camera_info_urls_desc);
+
+    auto frame_id_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    frame_id_desc.description = "Frame ID that is to be associated with the sensor and, in turn, "
+                                "with the image data. If multiple streams are supported by the "
+                                "camera, the given ID serves as a base string to which the "
+                                "stream name is appended, together with '_' as separator. If no "
+                                "frame ID is specified, the name of the node will be used.";
+    declare_parameter<std::string>("frame_id", "", frame_id_desc);
 }
 
 //==================================================================================================
@@ -227,7 +246,7 @@ void CameraAravis::setup_parameters()
     p_device_ = arv_camera_get_device(p_camera_);
 
     //--- connect control-lost signal
-    g_signal_connect(p_device_, "control-lost", (GCallback)CameraAravis::handleControlLost, this);
+    g_signal_connect(p_device_, "control-lost", (GCallback)CameraAravis::handle_control_lost_signal, this);
 
     return true;
 }
@@ -237,44 +256,89 @@ bool CameraAravis::initialize_camera_streams()
 {
     //--- get number of streams and associated names
 
-    int num_streams   = get_parameter("stream_count").as_int();
-    auto stream_names = get_parameter("stream_names").as_string_array();
-    num_streams       = std::max(1, num_streams);
+    int num_streams       = discover_stream_number();
+    auto stream_names     = get_parameter("stream_names").as_string_array();
+    auto pixel_formats    = get_parameter("pixel_formats").as_string_array();
+    auto camera_info_urls = get_parameter("camera_info_urls").as_string_array();
+    auto base_frame_id    = get_parameter("frame_id").as_string();
 
-    //--- check if given name list corresponds to stream count
-
-    if (static_cast<int>(stream_names.size()) != num_streams)
+    //--- check that at least one pixel format and one camera_info_url is specified
+    if (pixel_formats.empty())
     {
-        RCLCPP_WARN(logger_, "Size of 'stream_names' does not correspond 'num_streams'.");
+        RCLCPP_FATAL(logger_, "At least one 'pixel_format' needs to be specified.");
+        return false;
+    }
+    if (camera_info_urls.empty())
+    {
+        RCLCPP_FATAL(logger_, "At least one 'camera_info_url' needs to be specified.");
+        return false;
+    }
 
-        if (static_cast<int>(stream_names.size()) < num_streams)
+    //--- check if same number of pixel_formats and camera_info_urls are provided
+    if (pixel_formats.size() != camera_info_urls.size())
+    {
+        RCLCPP_WARN(logger_,
+                    "Different number of 'pixel_formats' and 'camera_info_urls' specified.");
+
+        if (pixel_formats.size() < camera_info_urls.size())
         {
-            num_streams = stream_names.size();
+            camera_info_urls.resize(pixel_formats.size());
             RCLCPP_WARN(logger_,
-                        "Only spawning %i stream(s) (length of 'steam_names').",
+                        "Truncating 'camera_info_urls' to first %i elements.",
+                        static_cast<int>(pixel_formats.size()));
+        }
+        else
+        {
+            pixel_formats.resize(camera_info_urls.size());
+            RCLCPP_WARN(logger_,
+                        "Truncating 'pixel_formats' to first %i elements.",
+                        static_cast<int>(camera_info_urls.size()));
+        }
+    }
+
+    //--- check if number pixel_formats corresponds to available number of streams
+    if (static_cast<int>(pixel_formats.size()) != num_streams)
+    {
+        if (static_cast<int>(pixel_formats.size()) > num_streams)
+        {
+            RCLCPP_WARN(logger_,
+                        "Insufficient number of streams supported by camera.");
+            RCLCPP_WARN(logger_,
+                        "Truncating 'pixel_formats' and 'camera_info_urls' to first %i elements.",
                         num_streams);
         }
         else
         {
-            stream_names.resize(num_streams);
-            RCLCPP_WARN(logger_,
-                        "Truncating 'stream_names' to %i elements.",
-                        static_cast<int>(stream_names.size()));
+            num_streams = static_cast<int>(pixel_formats.size());
         }
     }
 
+    //--- check if frame_id is empty
+    if (base_frame_id.empty())
+    {
+        base_frame_id = this->get_fully_qualified_name();
+        base_frame_id.replace(0, 1, ""); // remove first '/'
+        std::replace(base_frame_id.begin(), base_frame_id.end(), '/', '_');
+    }
+
     //--- initialize stream list
-    streams_ = std::vector<Stream>(stream_names.size());
-    for (uint i = 0; i < stream_names.size(); ++i)
+    streams_ = std::vector<Stream>(num_streams);
+    for (uint i = 0; i < streams_.size(); ++i)
     {
         Stream& stream = streams_[i];
 
-        stream.name = stream_names[i];
+        //--- if no or insufficient stream names are specified, use ID as name
+        stream.name            = (i < stream_names.size())
+                                   ? stream_names[i]
+                                   : ("stream" + std::to_string(i));
+        stream.sensor.frame_id = (!stream_names.empty() || num_streams > 1)
+                                   ? base_frame_id + "_" + stream.name
+                                   : base_frame_id;
 
         //--- setup image topic and create publisher
         std::string topic_name = this->get_name();
         // p_transport            = new image_transport::ImageTransport(pnh);
-        if (!stream.name.empty())
+        if (!stream_names.empty() || num_streams > 1) // if more than one stream available, add stream name
             topic_name += "/" + stream.name;
         topic_name += "/image_raw";
 
@@ -289,6 +353,38 @@ bool CameraAravis::initialize_camera_streams()
     }
 
     return true;
+}
+
+//==================================================================================================
+int CameraAravis::discover_stream_number()
+{
+    int num_streams = 0;
+
+    if (p_device_)
+    {
+        num_streams = arv_device_get_integer_feature_value(p_device_, "DeviceStreamChannelCount",
+                                                           nullptr);
+
+        if (num_streams == 0 && arv_camera_is_gv_device(p_camera_))
+        {
+            num_streams = arv_device_get_integer_feature_value(p_device_, "GevStreamChannelCount",
+                                                               nullptr);
+        }
+    }
+
+    if (num_streams == 0 || !p_device_)
+    {
+        num_streams = 1;
+        RCLCPP_INFO(logger_, "Unable to automatically detect number of supported stream channels. "
+                             "Setting num_streams = %i.",
+                    num_streams);
+    }
+    else
+    {
+        RCLCPP_INFO(logger_, "Number of supported stream channels: %i", num_streams);
+    }
+
+    return num_streams;
 }
 
 //==================================================================================================
@@ -361,9 +457,10 @@ void CameraAravis::spawn_camera_streams()
 
     for (uint i = 0; i < streams_.size(); i++)
     {
-        RCLCPP_INFO(logger_, "Spawning camera stream with ID %i", i);
-
         Stream& stream = streams_[i];
+
+        RCLCPP_INFO(logger_, "Spawning camera stream with ID %i (%s)", i,
+                    stream.sensor.frame_id.c_str());
 
         const int MAX_RETRIES = 60;
         int tryCount          = 1;
@@ -391,16 +488,17 @@ void CameraAravis::spawn_camera_streams()
                 stream.buffer_processing_thread =
                   std::thread(&CameraAravis::process_stream_buffer, this, i);
 
-                tuneGvStream(reinterpret_cast<ArvGvStream*>(stream.p_arv_stream));
+                tune_gv_stream(reinterpret_cast<ArvGvStream*>(stream.p_arv_stream));
 
                 num_opened_streams++;
                 break;
             }
             else
             {
-                RCLCPP_WARN(logger_, "%s: Could not create image stream with ID %i. "
+                RCLCPP_WARN(logger_, "%s: Could not create image stream with ID %i (%s). "
                                      "Retrying (%i/%i) ...",
-                            guid_.c_str(), i, tryCount, MAX_RETRIES);
+                            guid_.c_str(), i, stream.sensor.frame_id.c_str(),
+                            tryCount, MAX_RETRIES);
                 rclcpp::sleep_for(std::chrono::seconds(1));
                 tryCount++;
             }
@@ -408,8 +506,8 @@ void CameraAravis::spawn_camera_streams()
 
         //--- check if stream could be established
         if (!stream.p_arv_stream)
-            RCLCPP_ERROR(logger_, "%s: Could not create image stream with ID %i.",
-                         guid_.c_str(), i);
+            RCLCPP_ERROR(logger_, "%s: Could not create image stream with ID %i (%s).",
+                         guid_.c_str(), i, stream.sensor.frame_id.c_str());
     }
     is_spawning_ = false;
 
@@ -434,7 +532,7 @@ void CameraAravis::spawn_camera_streams()
             std::make_tuple(this, i)));
 
         g_signal_connect(STREAM.p_arv_stream, "new-buffer",
-                         (GCallback)CameraAravis::handleNewBufferReady,
+                         (GCallback)CameraAravis::handle_new_buffer_signal,
                          new_buffer_cb_data_ptrs.back().get());
 
         arv_stream_set_emit_signals(STREAM.p_arv_stream, TRUE);
@@ -455,10 +553,12 @@ void CameraAravis::spawn_camera_streams()
                 vendor_name, model_name, (device_sn) ? device_sn : device_id);
     RCLCPP_INFO(logger_, "\tNum. Streams: (%i / %i)",
                 num_opened_streams, static_cast<int>(streams_.size()));
+
+    this->is_initialized_ = true;
 }
 
 //==================================================================================================
-void CameraAravis::tuneGvStream(ArvGvStream* p_stream) const
+void CameraAravis::tune_gv_stream(ArvGvStream* p_stream) const
 {
     if (!p_stream)
         return;
@@ -496,7 +596,10 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
 {
     using namespace std::chrono_literals;
 
-    RCLCPP_INFO(logger_, "Started processing thread for stream %i", stream_id);
+    Stream& stream = streams_[stream_id];
+
+    RCLCPP_INFO(logger_, "Started processing thread for stream %i (%s)", stream_id,
+                stream.sensor.frame_id.c_str());
 
 #ifdef MULTITHREAD_INSPECTION
     RCLCPP_INFO_STREAM(logger_, ">>>>>>>>>> Processing thread ID for stream "
@@ -504,19 +607,35 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
                                   << ": " << std::this_thread::get_id());
 #endif
 
-    Stream& stream = streams_[stream_id];
-
     while (stream.is_buffer_processed)
     {
         //--- pop buffer pointer from queue
-        ArvBuffer* p_arv_buffer = nullptr;
-        bool is_pop_successful  = stream.buffer_queue.try_pop(p_arv_buffer);
+        std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr> buffer_img_tuple;
+        bool is_pop_successful = stream.buffer_queue.try_pop(buffer_img_tuple);
+
+        //--- take ownership of pointers
+        ArvBuffer* p_arv_buffer                      = std::get<0>(buffer_img_tuple);
+        sensor_msgs::msg::Image::SharedPtr p_img_msg = std::get<1>(buffer_img_tuple);
 
         RCLCPP_INFO_STREAM(logger_, ">>>>>>>>>> isPopSuccessful: " << is_pop_successful);
         RCLCPP_INFO_STREAM(logger_, ">>>>>>>>>> ArvBuffer*: " << p_arv_buffer);
 
         if (!is_pop_successful)
-            std::this_thread::sleep_for(1000ms);
+        {
+            std::this_thread::sleep_for(5ms);
+            continue;
+        }
+
+        //--- set meta data of image message
+        set_image_msg_metadata(p_img_msg, p_arv_buffer, stream.sensor.frame_id);
+
+        //--- convert to ros format
+        // TODO: Introduce flag to check if format is to be converted
+        if (true)
+        {
+            sensor_msgs::msg::Image::SharedPtr cvt_msg_ptr =
+              stream.p_buffer_pool->getRecyclableImg();
+        }
 
 #ifdef MULTITHREAD_INSPECTION
         RCLCPP_INFO_STREAM(logger_, ">>>>>>>>>> TIME: "
@@ -524,11 +643,37 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
 #endif
     }
 
-    RCLCPP_INFO(logger_, "Finished processing thread for stream %i", stream_id);
+    RCLCPP_INFO(logger_, "Finished processing thread for stream %i (%s)", stream_id,
+                stream.sensor.frame_id.c_str());
 }
 
 //==================================================================================================
-void CameraAravis::printStreamStatistics() const
+void CameraAravis::set_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
+                                          ArvBuffer* p_buffer,
+                                          const std::string frame_id) const
+{
+    //--- fill header data
+
+    p_img_msg->header.stamp    = rclcpp::Time(use_ptp_timestamp_
+                                                ? arv_buffer_get_timestamp(p_buffer)
+                                                : arv_buffer_get_system_timestamp(p_buffer));
+    p_img_msg->header.frame_id = frame_id;
+
+    //--- fill payload
+
+    // TODO: Support ROI
+    gint x, y, width, height;
+    arv_buffer_get_image_region(p_buffer, &x, &y, &width, &height);
+    p_img_msg->width  = width;
+    p_img_msg->height = height;
+
+    // TODO: Support different encodings
+    p_img_msg->encoding = "rgb8";
+    p_img_msg->step     = (width * 24) / 8; // TODO: Bits per pixel.
+}
+
+//==================================================================================================
+void CameraAravis::print_stream_statistics() const
 {
     for (uint i = 0; i < streams_.size(); i++)
     {
@@ -543,7 +688,7 @@ void CameraAravis::printStreamStatistics() const
         arv_stream_get_statistics(STREAM.p_arv_stream,
                                   &n_completed_buffers, &n_failures, &n_underruns);
 
-        RCLCPP_INFO(logger_, "Statistics for stream %i:", i);
+        RCLCPP_INFO(logger_, "Statistics for stream %i (%s):", i, STREAM.sensor.frame_id.c_str());
         RCLCPP_INFO(logger_, "\tCompleted buffers = %lli", (unsigned long long)n_completed_buffers);
         RCLCPP_INFO(logger_, "\tFailures          = %lli", (unsigned long long)n_failures);
         RCLCPP_INFO(logger_, "\tUnderruns         = %lli", (unsigned long long)n_underruns);
@@ -562,7 +707,7 @@ void CameraAravis::printStreamStatistics() const
 }
 
 //==================================================================================================
-void CameraAravis::handleControlLost(ArvDevice* p_device, gpointer p_user_data)
+void CameraAravis::handle_control_lost_signal(ArvDevice* p_device, gpointer p_user_data)
 {
     RCL_UNUSED(p_device);
 
@@ -578,7 +723,7 @@ void CameraAravis::handleControlLost(ArvDevice* p_device, gpointer p_user_data)
 }
 
 //==================================================================================================
-void CameraAravis::handleNewBufferReady(ArvStream* p_stream, gpointer p_user_data)
+void CameraAravis::handle_new_buffer_signal(ArvStream* p_stream, gpointer p_user_data)
 {
     ///--- get data tuples from user data
     std::tuple<CameraAravis*, uint>* p_data_tuple = (std::tuple<CameraAravis*, uint>*)p_user_data;
@@ -603,11 +748,11 @@ void CameraAravis::handleNewBufferReady(ArvStream* p_stream, gpointer p_user_dat
     bool buffer_pool    = (bool)stream.p_buffer_pool;
     if (!buffer_success || !buffer_pool)
     {
-        if (arv_buffer_get_status(p_arv_buffer) != ARV_BUFFER_STATUS_SUCCESS)
+        if (!buffer_success)
         {
             RCLCPP_WARN(p_ca_instance->logger_,
                         "(%s) Frame error: %s",
-                        stream.frame_id.c_str(),
+                        stream.sensor.frame_id.c_str(),
                         szBufferStatusFromInt[arv_buffer_get_status(p_arv_buffer)]);
         }
 
@@ -615,8 +760,9 @@ void CameraAravis::handleNewBufferReady(ArvStream* p_stream, gpointer p_user_dat
         return;
     }
 
-    //--- push buffer pointer into concurrent queue to be processed by processing thread
-    stream.buffer_queue.push(p_arv_buffer);
+    //--- push buffer pointers into concurrent queue to be processed by processing thread
+    auto p_img_msg = (*stream.p_buffer_pool)[p_arv_buffer];
+    stream.buffer_queue.push(std::make_tuple(p_arv_buffer, p_img_msg));
 }
 
 } // end namespace camera_aravis

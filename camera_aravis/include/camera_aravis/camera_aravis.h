@@ -56,8 +56,37 @@ class CameraAravis : public rclcpp::Node
     //--- STRUCT DECLARATION ---//
 
     /**
+     * @brief Struct implementing Sensor
+     */
+    struct Sensor
+    {
+        Sensor() :
+          frame_id(""),
+          width(0),
+          height(0),
+          pixel_format(""),
+          n_bits_pixel(0)
+        {
+        }
+
+        /// Frame ID associated with the sensor.
+        std::string frame_id;
+
+        /// Width of the sensor in pixel.
+        int32_t width;
+
+        /// Height of the sensor in pixel.
+        int32_t height;
+
+        /// Pixel format associated ith the sensor.
+        std::string pixel_format;
+
+        /// Number of pixel associated with the pixel format.
+        size_t n_bits_pixel = 0;
+    };
+
+    /**
      * @brief Struct implementing camera stream.
-     * Consisting of pointer to aravis stream and a associated buffer pool.
      */
     struct Stream
     {
@@ -68,21 +97,10 @@ class CameraAravis : public rclcpp::Node
           p_arv_stream(nullptr),
           p_buffer_pool(CameraBufferPool::SharedPtr()),
           name(""),
-          frame_id(""),
+          sensor(Sensor()),
           p_camera_info_manager(nullptr),
           is_buffer_processed(false)
         {
-        }
-
-        /**
-         * @brief Initialization constructor
-         *
-         * @param[in] iName Stream name.
-         */
-        Stream(const std::string& iName) :
-          Stream()
-        {
-            name = iName;
         }
 
         /// Pointer to aravis stream.
@@ -94,8 +112,8 @@ class CameraAravis : public rclcpp::Node
         /// Name of stream.
         std::string name;
 
-        /// Frame ID corresponding to the image stream
-        std::string frame_id;
+        /// Sensor associated with the stream.
+        Sensor sensor;
 
         /// Camera publisher.
         image_transport::CameraPublisher camera_pub;
@@ -109,10 +127,9 @@ class CameraAravis : public rclcpp::Node
         /// Thread to process ready stream buffer.
         std::thread buffer_processing_thread;
 
-        // /// Mutex guarding concurrent access to stream buffer.
-        // std::mutex buffer_mutex;
-
-        tbb::concurrent_queue<ArvBuffer*> buffer_queue;
+        /// Concurrent queue holding the buffer data to be processed in a separate thread.
+        tbb::concurrent_queue<std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr>>
+          buffer_queue;
     };
 
     //--- METHOD DECLARATION ---//
@@ -130,6 +147,11 @@ class CameraAravis : public rclcpp::Node
      *
      */
     ~CameraAravis() override;
+
+    /**
+     * @brief Returns true, if node is initialized. False, otherwise.
+     */
+    bool is_initialized() const;
 
   private:
     /**
@@ -152,6 +174,11 @@ class CameraAravis : public rclcpp::Node
     [[nodiscard]] bool initialize_camera_streams();
 
     /**
+     * @brief Discover number of available camera streams.
+     */
+    int discover_stream_number();
+
+    /**
      * @brief Discover features available on the camera.
      */
     void discover_features();
@@ -166,7 +193,7 @@ class CameraAravis : public rclcpp::Node
      *
      * @param[in] p_stream Pointer to Aravis Gv stream.
      */
-    void tuneGvStream(ArvGvStream* p_stream) const;
+    void tune_gv_stream(ArvGvStream* p_stream) const;
 
     /**
      * @brief Process available stream buffer.
@@ -176,9 +203,20 @@ class CameraAravis : public rclcpp::Node
     void process_stream_buffer(const uint stream_id);
 
     /**
+     * @brief Set metadata to image message.
+     *
+     * @param[in,out] p_img_msg Pointer to image message.
+     * @param[in] p_buffer Pointer to aravis buffer holding the pixel data.
+     * @param[in] frame_id Frame ID of the image message.
+     */
+    void set_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
+                                ArvBuffer* p_buffer,
+                                const std::string frame_id) const;
+
+    /**
      * @brief Print stream statistics, such as completed and failed buffers.
      */
-    void printStreamStatistics() const;
+    void print_stream_statistics() const;
 
     //--- FUNCTION DECLARATION ---//
 
@@ -189,7 +227,7 @@ class CameraAravis : public rclcpp::Node
      * @param[in] p_device Pointer to aravis device.
      * @param[in] p_user_data Pointer to associated user data.
      */
-    static void handleControlLost(ArvDevice* p_device, gpointer p_user_data);
+    static void handle_control_lost_signal(ArvDevice* p_device, gpointer p_user_data);
 
     /**
      * @brief Handle 'new-buffer' signal emitted by aravis, notifying that a new buffer is ready.
@@ -197,10 +235,13 @@ class CameraAravis : public rclcpp::Node
      * @param[in] p_device Pointer to aravis device.
      * @param[in] p_user_data Pointer to associated user data.
      */
-    static void handleNewBufferReady(ArvStream* p_stream, gpointer p_user_data);
+    static void handle_new_buffer_signal(ArvStream* p_stream, gpointer p_user_data);
 
     //--- MEMBER DECLARATION ---//
   private:
+    /// Flag indicating if node is initialized.
+    bool is_initialized_;
+
     /// Logger object of node.
     rclcpp::Logger logger_;
 
@@ -222,8 +263,11 @@ class CameraAravis : public rclcpp::Node
     /// Thread in which the streams are spawned.
     std::thread spawn_stream_thread_;
 
-    /// List of pointers to data tuples for the new-buffer callback
+    /// List of pointers to data tuples for the new-buffer callback.
     std::vector<std::shared_ptr<std::tuple<CameraAravis*, uint>>> new_buffer_cb_data_ptrs;
+
+    /// Flag indicating to use PTP timestamp.
+    bool use_ptp_timestamp_;
 
     /// TODO: Deprecated?
     bool verbose_;
