@@ -31,7 +31,7 @@ int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<camera_aravis::CameraAravis>();
-    if (node->is_initialized())
+    if (node->is_spawning_or_initialized())
     {
         rclcpp::spin(node->get_node_base_interface());
     }

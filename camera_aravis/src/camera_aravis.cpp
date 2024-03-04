@@ -47,6 +47,18 @@
         return;                         \
     }
 
+// Conversions from integers to Arv types.
+static const char* arvBufferStatusFromInt[] =
+  {"ARV_BUFFER_STATUS_SUCCESS", "ARV_BUFFER_STATUS_CLEARED",
+   "ARV_BUFFER_STATUS_TIMEOUT", "ARV_BUFFER_STATUS_MISSING_PACKETS",
+   "ARV_BUFFER_STATUS_WRONG_PACKET_ID", "ARV_BUFFER_STATUS_SIZE_MISMATCH",
+   "ARV_BUFFER_STATUS_FILLING", "ARV_BUFFER_STATUS_ABORTED"};
+
+#ifdef MULTITHREAD_INSPECTION
+static std::chrono::time_point<std::chrono::system_clock> start;
+static int count = 0;
+#endif
+
 namespace camera_aravis
 {
 
@@ -109,8 +121,13 @@ CameraAravis::~CameraAravis()
     //--- join buffer threads
     for (uint i = 0; i < streams_.size(); i++)
     {
-        Stream& stream             = streams_[i];
+        Stream& stream = streams_[i];
+
         stream.is_buffer_processed = false;
+
+        //--- push empty object into queue to do final loop
+        stream.buffer_queue.push(std::make_tuple(nullptr, nullptr));
+
         if (stream.buffer_processing_thread.joinable())
             stream.buffer_processing_thread.join();
     }
@@ -128,9 +145,10 @@ CameraAravis::~CameraAravis()
 }
 
 //==================================================================================================
-bool CameraAravis::is_initialized() const
+bool CameraAravis::is_spawning_or_initialized() const
 {
-    return is_initialized_;
+
+    return (is_spawning_ || is_initialized_);
 }
 
 //==================================================================================================
@@ -334,6 +352,16 @@ bool CameraAravis::initialize_camera_streams()
         stream.sensor.frame_id = (!stream_names.empty() || num_streams > 1)
                                    ? base_frame_id + "_" + stream.name
                                    : base_frame_id;
+
+        //--- get pixel format and set conversion function
+        stream.sensor.pixel_format = pixel_formats[i];
+        const auto sensor_iter     = CONVERSIONS_DICTIONARY.find(stream.sensor.pixel_format);
+        if (sensor_iter != CONVERSIONS_DICTIONARY.end())
+            stream.cvt_pixel_format = sensor_iter->second;
+        else
+            RCLCPP_WARN(logger_, "There is no known conversion from %s to a usual ROS image "
+                                 "encoding. Likely you need to implement one.",
+                        stream.sensor.pixel_format.c_str());
 
         //--- setup image topic and create publisher
         std::string topic_name = this->get_name();
@@ -611,33 +639,39 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
     {
         //--- pop buffer pointer from queue
         std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr> buffer_img_tuple;
-        bool is_pop_successful = stream.buffer_queue.try_pop(buffer_img_tuple);
+        bool is_pop_successful = stream.buffer_queue.pop(buffer_img_tuple);
+        if (!is_pop_successful)
+            continue;
 
         //--- take ownership of pointers
         ArvBuffer* p_arv_buffer                      = std::get<0>(buffer_img_tuple);
         sensor_msgs::msg::Image::SharedPtr p_img_msg = std::get<1>(buffer_img_tuple);
-
-        RCLCPP_INFO_STREAM(logger_, ">>>>>>>>>> isPopSuccessful: " << is_pop_successful);
-        RCLCPP_INFO_STREAM(logger_, ">>>>>>>>>> ArvBuffer*: " << p_arv_buffer);
-
-        if (!is_pop_successful)
-        {
-            std::this_thread::sleep_for(5ms);
+        if (!p_arv_buffer || !p_img_msg)
             continue;
-        }
 
         //--- set meta data of image message
         set_image_msg_metadata(p_img_msg, p_arv_buffer, stream.sensor.frame_id);
 
         //--- convert to ros format
-        // TODO: Introduce flag to check if format is to be converted
-        if (true)
+        if (stream.cvt_pixel_format)
         {
-            sensor_msgs::msg::Image::SharedPtr cvt_msg_ptr =
+            sensor_msgs::msg::Image::SharedPtr p_cvt_img_msg =
               stream.p_buffer_pool->getRecyclableImg();
+            stream.cvt_pixel_format(p_img_msg, p_cvt_img_msg);
+            p_img_msg = p_cvt_img_msg;
         }
 
+        stream.camera_pub.publish(p_img_msg, std::make_shared<sensor_msgs::msg::CameraInfo>());
+
 #ifdef MULTITHREAD_INSPECTION
+        if (count == 0)
+            start = std::chrono::system_clock::now();
+        count++;
+        auto now                                      = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_seconds = now - start;
+
+        std::cout << "Hz " << (static_cast<double>(count) / elapsed_seconds.count()) << std::endl;
+
         RCLCPP_INFO_STREAM(logger_, ">>>>>>>>>> TIME: "
                                       << rclcpp::Clock{}.now().seconds());
 #endif
@@ -725,6 +759,7 @@ void CameraAravis::handle_control_lost_signal(ArvDevice* p_device, gpointer p_us
 //==================================================================================================
 void CameraAravis::handle_new_buffer_signal(ArvStream* p_stream, gpointer p_user_data)
 {
+
     ///--- get data tuples from user data
     std::tuple<CameraAravis*, uint>* p_data_tuple = (std::tuple<CameraAravis*, uint>*)p_user_data;
     CameraAravis* p_ca_instance                   = std::get<0>(*p_data_tuple);
@@ -753,7 +788,7 @@ void CameraAravis::handle_new_buffer_signal(ArvStream* p_stream, gpointer p_user
             RCLCPP_WARN(p_ca_instance->logger_,
                         "(%s) Frame error: %s",
                         stream.sensor.frame_id.c_str(),
-                        szBufferStatusFromInt[arv_buffer_get_status(p_arv_buffer)]);
+                        arvBufferStatusFromInt[arv_buffer_get_status(p_arv_buffer)]);
         }
 
         arv_stream_push_buffer(p_stream, p_arv_buffer);

@@ -24,7 +24,7 @@ def generate_launch_description():
                 {
                 "guid": "Allied Vision-Alvium G1-240c-05P3C",
                 "stream_names": ["vis"],
-                "pixel_formats": ["BayerRG8"],
+                "pixel_formats": ["RGB8"],
                 "camera_info_urls": [os.path.join(
                     get_package_share_directory('camera_aravis'),
                     'config/camera_info_example.yaml')]

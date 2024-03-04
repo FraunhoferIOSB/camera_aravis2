@@ -47,6 +47,7 @@ extern "C"
 
 // camera_aravis
 #include "camera_buffer_pool.h"
+#include "conversion_utils.h"
 #include "error.hpp"
 
 namespace camera_aravis
@@ -118,6 +119,9 @@ class CameraAravis : public rclcpp::Node
         /// Camera publisher.
         image_transport::CameraPublisher camera_pub;
 
+        /// Conversion function to convert pixel format from sensor into image message.
+        ConversionFunction cvt_pixel_format;
+
         /// Unique pointer to camera info manager.
         std::unique_ptr<camera_info_manager::CameraInfoManager> p_camera_info_manager;
 
@@ -128,7 +132,7 @@ class CameraAravis : public rclcpp::Node
         std::thread buffer_processing_thread;
 
         /// Concurrent queue holding the buffer data to be processed in a separate thread.
-        tbb::concurrent_queue<std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr>>
+        tbb::concurrent_bounded_queue<std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr>>
           buffer_queue;
     };
 
@@ -149,9 +153,9 @@ class CameraAravis : public rclcpp::Node
     ~CameraAravis() override;
 
     /**
-     * @brief Returns true, if node is initialized. False, otherwise.
+     * @brief Returns true, if node is spawning or is initialized. False, otherwise.
      */
-    bool is_initialized() const;
+    bool is_spawning_or_initialized() const;
 
   private:
     /**
