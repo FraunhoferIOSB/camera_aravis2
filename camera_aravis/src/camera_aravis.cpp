@@ -283,16 +283,22 @@ bool CameraAravis::set_up_camera_stream_structs()
     auto camera_info_urls = get_parameter("camera_info_urls").as_string_array();
     auto base_frame_id    = get_parameter("frame_id").as_string();
 
+    bool is_camera_info_url_param_empty = camera_info_urls.empty();
+
     //--- check that at least one pixel format and one camera_info_url is specified
     if (pixel_formats.empty())
     {
         RCLCPP_FATAL(logger_, "At least one 'pixel_format' needs to be specified.");
         return false;
     }
-    if (camera_info_urls.empty())
+    if (is_camera_info_url_param_empty)
     {
-        RCLCPP_FATAL(logger_, "At least one 'camera_info_url' needs to be specified.");
-        return false;
+        RCLCPP_WARN(logger_, "No camera_info_url specified. Initializing from camera GUID.");
+
+        // Here only empty strings are pushed into list as placeholders. The actual construction of
+        // the url is done later, when the stream names are set.
+        for (uint i = 0; i < pixel_formats.size(); i++)
+            camera_info_urls.push_back("");
     }
 
     //--- check if same number of pixel_formats and camera_info_urls are provided
@@ -322,6 +328,8 @@ bool CameraAravis::set_up_camera_stream_structs()
     {
         if (static_cast<int>(pixel_formats.size()) > num_streams)
         {
+            pixel_formats.resize(num_streams);
+            camera_info_urls.resize(num_streams);
             RCLCPP_WARN(logger_,
                         "Insufficient number of streams supported by camera.");
             RCLCPP_WARN(logger_,
@@ -343,7 +351,8 @@ bool CameraAravis::set_up_camera_stream_structs()
     }
 
     //--- set up structs
-    streams_ = std::vector<Stream>(num_streams);
+    const std::string GUID_STR = construct_camera_guid_str(p_camera_);
+    streams_                   = std::vector<Stream>(num_streams);
     for (uint i = 0; i < streams_.size(); ++i)
     {
         Stream& stream = streams_[i];
@@ -359,14 +368,44 @@ bool CameraAravis::set_up_camera_stream_structs()
         //--- get pixel format
         stream.sensor.pixel_format = pixel_formats[i];
 
+        //--- get camera_info url
+        if (is_camera_info_url_param_empty)
+        {
+            if (streams_.size() > 1)
+                stream.camera_info_url = "file://" + GUID_STR + "_" + stream.name + ".yaml";
+            else
+                stream.camera_info_url = "file://" + GUID_STR + ".yaml";
+
+            // replace whitespaces in url (coming from GUID) with '_'
+            std::replace(stream.camera_info_url.begin(), stream.camera_info_url.end(), ' ', '_');
+        }
+        else
+        {
+            stream.camera_info_url = camera_info_urls[i];
+
+            //--- add 'file://' to beginning of camera_info_url
+            if (stream.camera_info_url.find_first_of("file://") != 0)
+                stream.camera_info_url = "file://" + stream.camera_info_url;
+        }
+
         //--- setup image topic and create publisher
         std::string topic_name = this->get_name();
         // p_transport            = new image_transport::ImageTransport(pnh);
-        if (!stream_names.empty() || num_streams > 1) // if more than one stream available, add stream name
+        // if more than one stream available, add stream name
+        if (!stream_names.empty() || num_streams > 1)
             topic_name += "/" + stream.name;
         topic_name += "/image_raw";
 
         stream.camera_pub = image_transport::create_camera_publisher(this, topic_name);
+
+        //--- initialize camera_info manager
+        // NOTE: Previously, separate node handles where used for CameraInfoManagers in case of a
+        // Multisource Camera. Uncertain if this is still relevant.
+        stream.p_camera_info_manager.reset(
+          new camera_info_manager::CameraInfoManager(this, stream.sensor.frame_id));
+        bool is_successful = stream.p_camera_info_manager->loadCameraInfo(stream.camera_info_url);
+        if (!is_successful)
+            return false;
     }
 
     //--- check if at least one stream was initialized
@@ -417,7 +456,8 @@ bool CameraAravis::set_up_camera_stream_structs()
             RCLCPP_WARN(logger_, "There is no known conversion from %s to a usual ROS image "
                                  "encoding. Likely you need to implement one.",
                         sensor.pixel_format.c_str());
-        sensor.n_bits_pixel = ARV_PIXEL_FORMAT_BIT_PER_PIXEL(arv_camera_get_pixel_format(p_camera_, err.ref()));
+        sensor.n_bits_pixel =
+          ARV_PIXEL_FORMAT_BIT_PER_PIXEL(arv_camera_get_pixel_format(p_camera_, err.ref()));
         ASSERT_GERROR(err, logger_, isSuccessful);
 
         if (!isSuccessful)
@@ -615,14 +655,9 @@ void CameraAravis::spawn_camera_streams()
     CHECK_GERROR(err, logger_);
 
     //--- print final output message
-    const char* vendor_name = arv_camera_get_vendor_name(p_camera_, nullptr);
-    const char* model_name  = arv_camera_get_model_name(p_camera_, nullptr);
-    const char* device_sn   = arv_camera_get_device_serial_number(p_camera_, nullptr);
-    const char* device_id   = arv_camera_get_device_id(p_camera_, nullptr);
-
+    std::string camera_guid_str = construct_camera_guid_str(p_camera_);
     RCLCPP_INFO(logger_, "Done initializing camera_aravis.");
-    RCLCPP_INFO(logger_, "\tCamera: %s-%s-%s",
-                vendor_name, model_name, (device_sn) ? device_sn : device_id);
+    RCLCPP_INFO(logger_, "\tCamera: %s", camera_guid_str.c_str());
     RCLCPP_INFO(logger_, "\tNum. Streams: (%i / %i)",
                 num_opened_streams, static_cast<int>(streams_.size()));
 
@@ -692,7 +727,7 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
             continue;
 
         //--- set meta data of image message
-        set_image_msg_metadata(p_img_msg, p_arv_buffer, stream.sensor);
+        fill_image_msg_metadata(p_img_msg, p_arv_buffer, stream.sensor);
 
         //--- convert to ros format
         if (stream.cvt_pixel_format)
@@ -703,9 +738,11 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
             p_img_msg = p_cvt_img_msg;
         }
 
-        // TODO: camera_info
+        //--- fill camera_info message
+        fill_camera_info_msg(stream, p_img_msg->header, p_arv_buffer);
 
-        stream.camera_pub.publish(p_img_msg, std::make_shared<sensor_msgs::msg::CameraInfo>());
+        //--- publish
+        stream.camera_pub.publish(p_img_msg, stream.p_cam_info_msg);
 
 #ifdef MULTITHREAD_INSPECTION
         if (count == 0)
@@ -726,9 +763,9 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
 }
 
 //==================================================================================================
-void CameraAravis::set_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
-                                          ArvBuffer* p_buffer,
-                                          const Sensor& sensor) const
+void CameraAravis::fill_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
+                                           ArvBuffer* p_buffer,
+                                           const Sensor& sensor) const
 {
     //--- fill header data
 
@@ -746,6 +783,39 @@ void CameraAravis::set_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_
     p_img_msg->height   = height;
     p_img_msg->encoding = sensor.pixel_format;
     p_img_msg->step     = (width * sensor.n_bits_pixel) / 8;
+}
+
+//==================================================================================================
+void CameraAravis::fill_camera_info_msg(Stream& stream, const std_msgs::msg::Header& header,
+                                        ArvBuffer* tmp_p_buffer) const
+{
+    //--- reset pointer to camera_info message, if not already set
+    if (!stream.p_cam_info_msg)
+    {
+        stream.p_cam_info_msg.reset(new sensor_msgs::msg::CameraInfo());
+    }
+
+    //--- fill data
+    (*stream.p_cam_info_msg)      = stream.p_camera_info_manager->getCameraInfo();
+    stream.p_cam_info_msg->header = header;
+
+    // TODO: Support ROI
+    gint x, y, roi_width, roi_height;
+    arv_buffer_get_image_region(tmp_p_buffer, &x, &y, &roi_width, &roi_height);
+
+    if (stream.p_cam_info_msg->width != static_cast<uint32_t>(roi_width) ||
+        stream.p_cam_info_msg->height != static_cast<uint32_t>(roi_height))
+    {
+        RCLCPP_WARN_ONCE(
+          logger_,
+          "The fields image_width and image_height seem to be inconsistent with the data in "
+          "the YAML specified by 'camera_info_url' parameter. Please set them there, because "
+          "actual image size and specified image size can be different due to the "
+          "region of interest (ROI) feature. In the YAML the image size should be the one on which "
+          "the camera was calibrated. See CameraInfo.msg specification!");
+        stream.p_cam_info_msg->width  = roi_width;
+        stream.p_cam_info_msg->height = roi_height;
+    }
 }
 
 //==================================================================================================
@@ -780,6 +850,19 @@ void CameraAravis::print_stream_statistics() const
             RCLCPP_INFO(logger_, "\tMissing           = %lli", (unsigned long long)n_missing);
         }
     }
+}
+
+//==================================================================================================
+inline std::string CameraAravis::construct_camera_guid_str(ArvCamera* p_cam)
+{
+    const char* vendor_name = arv_camera_get_vendor_name(p_cam, nullptr);
+    const char* model_name  = arv_camera_get_model_name(p_cam, nullptr);
+    const char* device_sn   = arv_camera_get_device_serial_number(p_cam, nullptr);
+    const char* device_id   = arv_camera_get_device_id(p_cam, nullptr);
+
+    return (std::string(vendor_name) + "-" +
+            std::string(model_name) + "-" +
+            std::string((device_sn) ? device_sn : device_id));
 }
 
 //==================================================================================================

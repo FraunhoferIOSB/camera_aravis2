@@ -97,6 +97,7 @@ class CameraAravis : public rclcpp::Node
           name(""),
           sensor(Sensor()),
           p_camera_info_manager(nullptr),
+          p_cam_info_msg(nullptr),
           is_buffer_processed(false)
         {
         }
@@ -113,14 +114,20 @@ class CameraAravis : public rclcpp::Node
         /// Sensor associated with the stream.
         Sensor sensor;
 
-        /// Camera publisher.
-        image_transport::CameraPublisher camera_pub;
+        /// URL to camera info yaml file.
+        std::string camera_info_url;
 
         /// Conversion function to convert pixel format from sensor into image message.
         ConversionFunction cvt_pixel_format;
 
+        /// Camera publisher.
+        image_transport::CameraPublisher camera_pub;
+
         /// Unique pointer to camera info manager.
         std::unique_ptr<camera_info_manager::CameraInfoManager> p_camera_info_manager;
+
+        /// Pointer to camera_info message.
+        sensor_msgs::msg::CameraInfo::SharedPtr p_cam_info_msg;
 
         /// Flag controlling processing of buffer data.
         bool is_buffer_processed;
@@ -222,9 +229,17 @@ class CameraAravis : public rclcpp::Node
      * @param[in] sensor Sensor object corresponding to image. Used to set frame_id, image_encoding,
      * and more.
      */
-    void set_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
-                                ArvBuffer* p_buffer,
-                                const Sensor& sensor) const;
+    void fill_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
+                                 ArvBuffer* p_buffer,
+                                 const Sensor& sensor) const;
+
+    /**
+     * @brief Fill camera_info message.
+     *
+     * @param[in,out] stream Stream object which holds camera_info message and other data.
+     */
+    void fill_camera_info_msg(Stream& stream, const std_msgs::msg::Header& header,
+                              ArvBuffer* tmp_p_buffer) const;
 
     /**
      * @brief Print stream statistics, such as completed and failed buffers.
@@ -234,6 +249,14 @@ class CameraAravis : public rclcpp::Node
     //--- FUNCTION DECLARATION ---//
 
   protected:
+    /**
+     * @brief Construct GUID string of given camera, using vendor name, model name and
+     * device serial number.
+     *
+     * @return GUID in the format: <vendor_name>-<model_name>-<device_sn | device_id>.
+     */
+    static inline std::string construct_camera_guid_str(ArvCamera* p_cam);
+
     /**
      * @brief Handle 'control-lost' signal emitted by aravis.
      *
