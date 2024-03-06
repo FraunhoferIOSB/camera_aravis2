@@ -21,18 +21,14 @@
  *
  ****************************************************************************/
 
-#ifndef CAMERA_ARAVIS_CAMERA_ARAVIS
-#define CAMERA_ARAVIS_CAMERA_ARAVIS
+#ifndef CAMERA_ARAVIS__CAMERA_ARAVIS_H_
+#define CAMERA_ARAVIS__CAMERA_ARAVIS_H_
 
 // Std
 #include <memory>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
-
-// TBB
-// TODO: Swap TBB Concurrent Queue with own implementation
-#include <tbb/concurrent_queue.h>
 
 // Aravis
 extern "C"
@@ -47,6 +43,7 @@ extern "C"
 
 // camera_aravis
 #include "camera_buffer_pool.h"
+#include "concurrent_queue.hpp"
 #include "conversion_utils.h"
 #include "error.hpp"
 
@@ -132,7 +129,7 @@ class CameraAravis : public rclcpp::Node
         std::thread buffer_processing_thread;
 
         /// Concurrent queue holding the buffer data to be processed in a separate thread.
-        tbb::concurrent_bounded_queue<std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr>>
+        ConcurrentQueue<std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr>>
           buffer_queue;
     };
 
@@ -171,11 +168,22 @@ class CameraAravis : public rclcpp::Node
     [[nodiscard]] bool discover_and_open_camera_device();
 
     /**
-     * @brief Initialize camera stream. Get number of streams available, and initialize structs.
+     * @brief Set up camera stream structs. Here, the number of streams available are discovered,
+     * and user settings are read from launch parameters and are used to set up structs. This also
+     * involves the logic of how to handle faults of inconsistent number of stream_names,
+     * pixel_formats, and camera_info settings.
      *
      * @return True if successful. False, otherwise.
      */
-    [[nodiscard]] bool initialize_camera_streams();
+    [[nodiscard]] bool set_up_camera_stream_structs();
+
+    /**
+     * @brief Initialize settings revolving around the pixel formats, i.e. conversion functions and
+     * bits per pixel, and set parameters on camera accordingly.
+     *
+     * @return  True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool initialize_and_set_pixel_formats();
 
     /**
      * @brief Discover number of available camera streams.
@@ -211,11 +219,12 @@ class CameraAravis : public rclcpp::Node
      *
      * @param[in,out] p_img_msg Pointer to image message.
      * @param[in] p_buffer Pointer to aravis buffer holding the pixel data.
-     * @param[in] frame_id Frame ID of the image message.
+     * @param[in] sensor Sensor object corresponding to image. Used to set frame_id, image_encoding,
+     * and more.
      */
     void set_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
                                 ArvBuffer* p_buffer,
-                                const std::string frame_id) const;
+                                const Sensor& sensor) const;
 
     /**
      * @brief Print stream statistics, such as completed and failed buffers.
@@ -282,4 +291,4 @@ class CameraAravis : public rclcpp::Node
 
 } // namespace camera_aravis
 
-#endif // CAMERA_ARAVIS_CAMERA_ARAVIS
+#endif // CAMERA_ARAVIS__CAMERA_ARAVIS_H_

@@ -21,8 +21,8 @@
  *
  ****************************************************************************/
 
-#ifndef CAMERA_ARAVIS_CAMERA_BUFFER_POOL
-#define CAMERA_ARAVIS_CAMERA_BUFFER_POOL
+#ifndef CAMERA_ARAVIS__CAMERA_BUFFER_POOL_H_
+#define CAMERA_ARAVIS__CAMERA_BUFFER_POOL_H_
 
 // Std
 #include <map>
@@ -114,6 +114,6 @@ class CameraBufferPool : public std::enable_shared_from_this<CameraBufferPool>
     rclcpp::Logger logger_;
 };
 
-} /* namespace camera_aravis */
+} // namespace camera_aravis
 
-#endif /* CAMERA_ARAVIS_CAMERA_BUFFER_POOL */
+#endif // CAMERA_ARAVIS__CAMERA_BUFFER_POOL_H_

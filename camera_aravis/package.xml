@@ -4,7 +4,7 @@
   <name>camera_aravis</name>
   <version>2.0.0</version>
   <description>A complete and comfortable GenICam (USB3Vision and GigEVision) based camera driver for ROS2 (Ethernet and USB).</description>
-  <maintainer email="dominik.kleiser@iosb.fraunhofer.de">Dominik Kleiser</maintainer>
+  <maintainer email="boitumelo.ruf@iosb.fraunhofer.de">Boitumelo Ruf</maintainer>
   <license>LGPL-2.1-or-later</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

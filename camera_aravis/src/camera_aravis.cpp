@@ -85,8 +85,11 @@ CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) :
     //--- open camera device
     ASSERT_SUCCESS(discover_and_open_camera_device());
 
-    //--- initialize stream list
-    ASSERT_SUCCESS(initialize_camera_streams());
+    //--- set up structs holding relevant information of camera streams
+    ASSERT_SUCCESS(set_up_camera_stream_structs());
+
+    //--- initialize and set pixel format settings
+    ASSERT_SUCCESS(initialize_and_set_pixel_formats());
 
     //--- spawn camera stream in thread, so that initialization is not blocked
     is_spawning_         = true;
@@ -270,7 +273,7 @@ void CameraAravis::setup_parameters()
 }
 
 //==================================================================================================
-bool CameraAravis::initialize_camera_streams()
+bool CameraAravis::set_up_camera_stream_structs()
 {
     //--- get number of streams and associated names
 
@@ -339,7 +342,7 @@ bool CameraAravis::initialize_camera_streams()
         std::replace(base_frame_id.begin(), base_frame_id.end(), '/', '_');
     }
 
-    //--- initialize stream list
+    //--- set up structs
     streams_ = std::vector<Stream>(num_streams);
     for (uint i = 0; i < streams_.size(); ++i)
     {
@@ -353,15 +356,8 @@ bool CameraAravis::initialize_camera_streams()
                                    ? base_frame_id + "_" + stream.name
                                    : base_frame_id;
 
-        //--- get pixel format and set conversion function
+        //--- get pixel format
         stream.sensor.pixel_format = pixel_formats[i];
-        const auto sensor_iter     = CONVERSIONS_DICTIONARY.find(stream.sensor.pixel_format);
-        if (sensor_iter != CONVERSIONS_DICTIONARY.end())
-            stream.cvt_pixel_format = sensor_iter->second;
-        else
-            RCLCPP_WARN(logger_, "There is no known conversion from %s to a usual ROS image "
-                                 "encoding. Likely you need to implement one.",
-                        stream.sensor.pixel_format.c_str());
 
         //--- setup image topic and create publisher
         std::string topic_name = this->get_name();
@@ -378,6 +374,54 @@ bool CameraAravis::initialize_camera_streams()
     {
         RCLCPP_FATAL(logger_, "Something went wrong in the initialization of the camera streams.");
         return false;
+    }
+
+    return true;
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraAravis::initialize_and_set_pixel_formats()
+{
+    // Guarded error object
+    GuardedGError err;
+
+    for (uint i = 0; i < streams_.size(); ++i)
+    {
+        bool isSuccessful = true;
+
+        Stream& stream = streams_[i];
+        Sensor& sensor = stream.sensor;
+
+        //--- set source, if applicable
+        if (streams_.size() > 1)
+        {
+            // TODO(boitumeloruf): make more source selector more generic
+            std::string src_selector_val = "Source" + std::to_string(i);
+            arv_device_set_string_feature_value(p_device_,
+                                                "SourceSelector", src_selector_val.c_str(),
+                                                err.ref());
+            ASSERT_GERROR(err, logger_, isSuccessful);
+        }
+
+        //--- set desired pixel format and get actual value that has been set
+        arv_camera_set_pixel_format_from_string(p_camera_, sensor.pixel_format.c_str(),
+                                                err.ref());
+        sensor.pixel_format = arv_camera_get_pixel_format_as_string(p_camera_, err.ref());
+        ASSERT_GERROR(err, logger_, isSuccessful);
+
+        //--- get conversion function and number of bits per pixel corresponding to pixel format
+        const auto sensor_iter = CONVERSIONS_DICTIONARY.find(sensor.pixel_format);
+        if (sensor_iter != CONVERSIONS_DICTIONARY.end())
+            stream.cvt_pixel_format = sensor_iter->second;
+        else
+            RCLCPP_WARN(logger_, "There is no known conversion from %s to a usual ROS image "
+                                 "encoding. Likely you need to implement one.",
+                        sensor.pixel_format.c_str());
+        sensor.n_bits_pixel = ARV_PIXEL_FORMAT_BIT_PER_PIXEL(arv_camera_get_pixel_format(p_camera_, err.ref()));
+        ASSERT_GERROR(err, logger_, isSuccessful);
+
+        if (!isSuccessful)
+            return false;
     }
 
     return true;
@@ -637,11 +681,9 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
 
     while (stream.is_buffer_processed)
     {
-        //--- pop buffer pointer from queue
+        //--- pop buffer pointer from queue, blocking if no item is available
         std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr> buffer_img_tuple;
-        bool is_pop_successful = stream.buffer_queue.pop(buffer_img_tuple);
-        if (!is_pop_successful)
-            continue;
+        stream.buffer_queue.pop(buffer_img_tuple);
 
         //--- take ownership of pointers
         ArvBuffer* p_arv_buffer                      = std::get<0>(buffer_img_tuple);
@@ -650,7 +692,7 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
             continue;
 
         //--- set meta data of image message
-        set_image_msg_metadata(p_img_msg, p_arv_buffer, stream.sensor.frame_id);
+        set_image_msg_metadata(p_img_msg, p_arv_buffer, stream.sensor);
 
         //--- convert to ros format
         if (stream.cvt_pixel_format)
@@ -660,6 +702,8 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
             stream.cvt_pixel_format(p_img_msg, p_cvt_img_msg);
             p_img_msg = p_cvt_img_msg;
         }
+
+        // TODO: camera_info
 
         stream.camera_pub.publish(p_img_msg, std::make_shared<sensor_msgs::msg::CameraInfo>());
 
@@ -684,26 +728,24 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
 //==================================================================================================
 void CameraAravis::set_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
                                           ArvBuffer* p_buffer,
-                                          const std::string frame_id) const
+                                          const Sensor& sensor) const
 {
     //--- fill header data
 
     p_img_msg->header.stamp    = rclcpp::Time(use_ptp_timestamp_
                                                 ? arv_buffer_get_timestamp(p_buffer)
                                                 : arv_buffer_get_system_timestamp(p_buffer));
-    p_img_msg->header.frame_id = frame_id;
+    p_img_msg->header.frame_id = sensor.frame_id;
 
-    //--- fill payload
+    //--- fill image meta data
 
     // TODO: Support ROI
     gint x, y, width, height;
     arv_buffer_get_image_region(p_buffer, &x, &y, &width, &height);
-    p_img_msg->width  = width;
-    p_img_msg->height = height;
-
-    // TODO: Support different encodings
-    p_img_msg->encoding = "rgb8";
-    p_img_msg->step     = (width * 24) / 8; // TODO: Bits per pixel.
+    p_img_msg->width    = width;
+    p_img_msg->height   = height;
+    p_img_msg->encoding = sensor.pixel_format;
+    p_img_msg->step     = (width * sensor.n_bits_pixel) / 8;
 }
 
 //==================================================================================================

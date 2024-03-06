@@ -21,8 +21,8 @@
  *
  ****************************************************************************/
 
-#ifndef CAMERA_ARAVIS_ERROR
-#define CAMERA_ARAVIS_ERROR
+#ifndef CAMERA_ARAVIS__ERROR_HPP_
+#define CAMERA_ARAVIS__ERROR_HPP_
 
 // Std
 #include <string>
@@ -37,12 +37,12 @@
 #define ASSERT_GERROR(err, logger, success) \
     if (err)                                \
     {                                       \
-        success = false;                    \
+        success &= false;                   \
         err.log(logger);                    \
     }                                       \
     else                                    \
     {                                       \
-        success = true;                     \
+        success &= true;                    \
     }
 
 /// Macro to check if error occurred and log if necessary
@@ -122,4 +122,4 @@ bool operator!=(const GuardedGError& lhs, std::nullptr_t)
 
 } // namespace camera_aravis
 
-#endif // CAMERA_ARAVIS_ERROR
+#endif // CAMERA_ARAVIS__ERROR_HPP_

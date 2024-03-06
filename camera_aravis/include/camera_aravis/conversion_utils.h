@@ -21,8 +21,8 @@
  *
  ****************************************************************************/
 
-#ifndef CAMERA_ARAVIS_CONVERSION_UTILS
-#define CAMERA_ARAVIS_CONVERSION_UTILS
+#ifndef CAMERA_ARAVIS__CONVERSION_UTILS_H_
+#define CAMERA_ARAVIS__CONVERSION_UTILS_H_
 
 // Std
 #include <functional>
@@ -268,4 +268,4 @@ const std::map<std::string, ConversionFunction> CONVERSIONS_DICTIONARY =
 
 } // end namespace camera_aravis
 
-#endif /* CAMERA_ARAVIS_CONVERSION_UTILS */
+#endif // CAMERA_ARAVIS__CONVERSION_UTILS_H_

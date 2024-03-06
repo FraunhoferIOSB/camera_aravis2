@@ -41,8 +41,6 @@ find_package(camera_aravis_msgs REQUIRED)
 find_package(Aravis REQUIRED)
 find_package(GLIB2 REQUIRED)
 
-find_package(TBB REQUIRED)
-
 include_directories(include
   ${Aravis_INCLUDE_DIRS}
   ${GLIB2_INCLUDE_DIRS}
@@ -68,7 +66,6 @@ set(LIBRARIES
   gobject-2.0
   cv_bridge::cv_bridge
   image_transport::image_transport
-  TBB::tbb
 )
 
 add_library(${LIBRARY_NAME} SHARED
