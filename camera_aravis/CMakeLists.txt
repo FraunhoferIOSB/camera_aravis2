@@ -30,7 +30,12 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 
+find_package(cv_bridge REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(camera_info_manager REQUIRED)
+
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(camera_aravis_msgs REQUIRED)
 
 find_package(Aravis REQUIRED)
@@ -47,7 +52,11 @@ set(LIBRARY_NAME ${EXECUTABLE_NAME}_core)
 set(DEPENDENCIES
   rclcpp
   rclcpp_components
+  cv_bridge
+  image_transport
+  camera_info_manager
   std_msgs
+  sensor_msgs
 )
 
 set(LIBRARIES
@@ -55,10 +64,14 @@ set(LIBRARIES
   glib-2.0
   gmodule-2.0
   gobject-2.0
+  cv_bridge::cv_bridge
+  image_transport::image_transport
 )
 
 add_library(${LIBRARY_NAME} SHARED
   src/camera_aravis.cpp
+  src/camera_buffer_pool.cpp
+  src/conversion_utils.cpp
 )
 target_link_libraries(${LIBRARY_NAME} ${LIBRARIES})
 ament_target_dependencies(${LIBRARY_NAME} ${DEPENDENCIES})
@@ -80,6 +93,7 @@ install(TARGETS ${EXECUTABLE_NAME}
 
 install(DIRECTORY include/ DESTINATION include/)
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
