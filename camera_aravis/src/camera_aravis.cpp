@@ -91,6 +91,9 @@ CameraAravis::CameraAravis(const rclcpp::NodeOptions& options) :
     //--- initialize and set pixel format settings
     ASSERT_SUCCESS(initialize_and_set_pixel_formats());
 
+    //--- set standard camera settings
+    ASSERT_SUCCESS(set_acquisition_control_settings());
+
     //--- spawn camera stream in thread, so that initialization is not blocked
     is_spawning_         = true;
     spawn_stream_thread_ = std::thread(&CameraAravis::spawn_camera_streams, this);
@@ -192,6 +195,28 @@ void CameraAravis::setup_parameters()
                                 "stream name is appended, together with '_' as separator. If no "
                                 "frame ID is specified, the name of the node will be used.";
     declare_parameter<std::string>("frame_id", "", frame_id_desc);
+
+    auto acquisition_mode_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    acquisition_mode_desc.description = "Acquisition mode that is to be set. Supported Values: "
+                                        "'Continuous', 'MultiFrame', 'SingleFrame'. "
+                                        "Default : 'Continuous'.";
+    declare_parameter<std::string>("acquisition_mode", "Continuous", acquisition_mode_desc);
+
+    auto frame_count_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    frame_count_desc.description = "Number of frames to be acquired, when 'acquisition_mode' is "
+                                   "set to 'MultiFrame'. Parameter is not evaluated if other mode "
+                                   "is selected. Default: 10.";
+    declare_parameter<int>("frame_count", 10, frame_count_desc);
+
+    auto frame_rate_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    frame_rate_desc.description = "Rate (per second) in which to acquire frames. Default: 30.";
+    declare_parameter<double>("frame_rate", 30, frame_rate_desc);
+
+    auto exposure_auto_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+    exposure_auto_desc.description = "Acquisition auto mode that is to be set. Supported Values: "
+                                     "'Off', 'Once', 'Continuous'. "
+                                     "Default : 'Continuous'.";
+    declare_parameter<std::string>("exposure_auto", "Continuous", exposure_auto_desc);
 }
 
 //==================================================================================================
@@ -400,7 +425,7 @@ bool CameraAravis::set_up_camera_stream_structs()
 
         //--- initialize camera_info manager
         // NOTE: Previously, separate node handles where used for CameraInfoManagers in case of a
-        // Multisource Camera. Uncertain if this is still relevant.
+        // Multi-source Camera. Uncertain if this is still relevant.
         stream.p_camera_info_manager.reset(
           new camera_info_manager::CameraInfoManager(this, stream.sensor.frame_id));
         bool is_successful = stream.p_camera_info_manager->loadCameraInfo(stream.camera_info_url);
@@ -465,6 +490,50 @@ bool CameraAravis::set_up_camera_stream_structs()
     }
 
     return true;
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraAravis::set_acquisition_control_settings()
+{
+    GuardedGError err;
+    bool is_successful = true;
+
+    //--- Acquisition mode
+    auto acquisition_mode_str = get_parameter("acquisition_mode").as_string();
+    auto acquisition_mode     = arv_acquisition_mode_from_string(acquisition_mode_str.c_str());
+    arv_camera_set_acquisition_mode(p_camera_, acquisition_mode, err.ref());
+    ASSERT_GERROR(err, logger_, is_successful);
+
+    //--- Frame count, if applicable
+    if (acquisition_mode == ARV_ACQUISITION_MODE_MULTI_FRAME)
+    {
+        auto frame_count = get_parameter("frame_count").as_int();
+        arv_camera_set_frame_count(p_camera_, frame_count, err.ref());
+        ASSERT_GERROR(err, logger_, is_successful);
+    }
+
+    //--- Frame rate
+    // TODO: currently faulting
+    // if (arv_camera_is_frame_rate_available(p_camera_, err.ref()))
+    // {
+    //     auto frame_rate = get_parameter("frame_rate").as_double();
+    //     arv_camera_set_frame_rate(p_camera_, frame_rate, err.ref());
+    // }
+    // ASSERT_GERROR(err, logger_, is_successful);
+
+    //--- Exposure
+    if (arv_camera_is_exposure_auto_available(p_camera_, err.ref()))
+    {
+        auto exposure_auto_str = get_parameter("exposure_auto").as_string();
+        auto exposure_auto     = arv_auto_from_string(exposure_auto_str.c_str());
+        arv_camera_set_exposure_time_auto(p_camera_, exposure_auto, err.ref());
+    }
+    ASSERT_GERROR(err, logger_, is_successful);
+
+    arv_camera_set_exposure_mode(p_camera_, ARV_EXPOSURE_MODE_TIMED, err.ref());
+    ASSERT_GERROR(err, logger_, is_successful);
+
+    return is_successful;
 }
 
 //==================================================================================================
@@ -739,7 +808,7 @@ void CameraAravis::process_stream_buffer(const uint stream_id)
         }
 
         //--- fill camera_info message
-        fill_camera_info_msg(stream, p_img_msg->header, p_arv_buffer);
+        fill_camera_info_msg(stream, p_img_msg);
 
         //--- publish
         stream.camera_pub.publish(p_img_msg, stream.p_cam_info_msg);
@@ -786,8 +855,8 @@ void CameraAravis::fill_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p
 }
 
 //==================================================================================================
-void CameraAravis::fill_camera_info_msg(Stream& stream, const std_msgs::msg::Header& header,
-                                        ArvBuffer* tmp_p_buffer) const
+void CameraAravis::fill_camera_info_msg(Stream& stream,
+                                        const sensor_msgs::msg::Image::SharedPtr& p_img_msg) const
 {
     //--- reset pointer to camera_info message, if not already set
     if (!stream.p_cam_info_msg)
@@ -797,24 +866,21 @@ void CameraAravis::fill_camera_info_msg(Stream& stream, const std_msgs::msg::Hea
 
     //--- fill data
     (*stream.p_cam_info_msg)      = stream.p_camera_info_manager->getCameraInfo();
-    stream.p_cam_info_msg->header = header;
+    stream.p_cam_info_msg->header = p_img_msg->header;
 
-    // TODO: Support ROI
-    gint x, y, roi_width, roi_height;
-    arv_buffer_get_image_region(tmp_p_buffer, &x, &y, &roi_width, &roi_height);
-
-    if (stream.p_cam_info_msg->width != static_cast<uint32_t>(roi_width) ||
-        stream.p_cam_info_msg->height != static_cast<uint32_t>(roi_height))
+    // TODO: Revise check of image_width and image_height
+    if (stream.p_cam_info_msg->width == 0 ||
+        stream.p_cam_info_msg->height == 0)
     {
         RCLCPP_WARN_ONCE(
           logger_,
-          "The fields image_width and image_height seem to be inconsistent with the data in "
-          "the YAML specified by 'camera_info_url' parameter. Please set them there, because "
-          "actual image size and specified image size can be different due to the "
+          "The fields image_width and image_height in the YAML specified by 'camera_info_url' "
+          "parameter seams to be inconsistent with the actual image size.. Please set them there, "
+          "because actual image size and specified image size can be different due to the "
           "region of interest (ROI) feature. In the YAML the image size should be the one on which "
           "the camera was calibrated. See CameraInfo.msg specification!");
-        stream.p_cam_info_msg->width  = roi_width;
-        stream.p_cam_info_msg->height = roi_height;
+        stream.p_cam_info_msg->width  = p_img_msg->width;
+        stream.p_cam_info_msg->height = p_img_msg->height;
     }
 }
 

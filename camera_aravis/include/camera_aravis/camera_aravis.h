@@ -188,9 +188,16 @@ class CameraAravis : public rclcpp::Node
      * @brief Initialize settings revolving around the pixel formats, i.e. conversion functions and
      * bits per pixel, and set parameters on camera accordingly.
      *
-     * @return  True if successful. False, otherwise.
+     * @return True if successful. False, otherwise.
      */
     [[nodiscard]] bool initialize_and_set_pixel_formats();
+
+    /**
+     * @brief Set acquisition control settings.
+     *
+     * @return True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool set_acquisition_control_settings();
 
     /**
      * @brief Discover number of available camera streams.
@@ -237,9 +244,10 @@ class CameraAravis : public rclcpp::Node
      * @brief Fill camera_info message.
      *
      * @param[in,out] stream Stream object which holds camera_info message and other data.
+     * @param[in] p_img_msg Pointer to corresponding image message.
      */
-    void fill_camera_info_msg(Stream& stream, const std_msgs::msg::Header& header,
-                              ArvBuffer* tmp_p_buffer) const;
+    void fill_camera_info_msg(Stream& stream,
+                              const sensor_msgs::msg::Image::SharedPtr& p_img_msg) const;
 
     /**
      * @brief Print stream statistics, such as completed and failed buffers.

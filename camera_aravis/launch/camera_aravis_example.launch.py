@@ -27,7 +27,8 @@ def generate_launch_description():
                 "pixel_formats": ["BayerRG8"],
                 "camera_info_urls": ["file://" + os.path.join(
                     get_package_share_directory('camera_aravis'),
-                    'config/camera_info_example.yaml')]
+                    'config/camera_info_example.yaml')],
+                "frame_rate": 5.0
                 }
             ]
     )
