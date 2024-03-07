@@ -25,7 +25,7 @@ PenaltyBreakString: 1000
 SpaceInEmptyParentheses: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
+SpacesBeforeTrailingComments: 2
 SortIncludes: true
 Standard: c++17
-
 ...

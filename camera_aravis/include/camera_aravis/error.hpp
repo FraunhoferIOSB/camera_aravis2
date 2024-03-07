@@ -16,14 +16,14 @@
 #ifndef CAMERA_ARAVIS__ERROR_HPP_
 #define CAMERA_ARAVIS__ERROR_HPP_
 
-// Std
-#include <string>
-
 // GLib
 #include <glib-2.0/glib/gerror.h>
 
+// Std
+#include <string>
+
 // ROS
-#include "rclcpp/rclcpp.hpp"
+#include <rclcpp/rclcpp.hpp>
 
 /// Macro to assert success and log GError if necessary
 #define ASSERT_GERROR(err, logger, success) \
@@ -47,7 +47,6 @@ namespace camera_aravis
 
 class GuardedGError
 {
-
     //--- METHOD DECLARATION ---//
   public:
     ~GuardedGError()
@@ -112,6 +111,6 @@ bool operator!=(const GuardedGError& lhs, std::nullptr_t)
     return !!lhs;
 }
 
-} // namespace camera_aravis
+}  // namespace camera_aravis
 
-#endif // CAMERA_ARAVIS__ERROR_HPP_
+#endif  // CAMERA_ARAVIS__ERROR_HPP_

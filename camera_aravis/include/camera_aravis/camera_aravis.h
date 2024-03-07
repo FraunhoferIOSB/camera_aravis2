@@ -18,6 +18,7 @@
 
 // Std
 #include <memory>
+#include <string>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -25,7 +26,7 @@
 // Aravis
 extern "C"
 {
-#include "arv.h"
+#include "aravis-0.8/arv.h"
 }
 
 // ROS
@@ -34,10 +35,10 @@ extern "C"
 #include <rclcpp/rclcpp.hpp>
 
 // camera_aravis
-#include "camera_buffer_pool.h"
-#include "concurrent_queue.hpp"
-#include "conversion_utils.h"
-#include "error.hpp"
+#include "camera_aravis/camera_buffer_pool.h"
+#include "camera_aravis/concurrent_queue.hpp"
+#include "camera_aravis/conversion_utils.h"
+#include "camera_aravis/error.hpp"
 
 namespace camera_aravis
 {
@@ -197,11 +198,6 @@ class CameraAravis : public rclcpp::Node
     int discover_stream_number();
 
     /**
-     * @brief Discover features available on the camera.
-     */
-    void discover_features();
-
-    /**
      * @brief Spawn camera streams.
      */
     void spawn_camera_streams();
@@ -304,14 +300,8 @@ class CameraAravis : public rclcpp::Node
 
     /// Flag indicating to use PTP timestamp.
     bool use_ptp_timestamp_;
-
-    /// TODO: Deprecated?
-    bool verbose_;
-
-    /// TODO: Deprecated?
-    std::unordered_map<std::string, const bool> implemented_features_;
 };
 
-} // namespace camera_aravis
+}  // namespace camera_aravis
 
-#endif // CAMERA_ARAVIS__CAMERA_ARAVIS_H_
+#endif  // CAMERA_ARAVIS__CAMERA_ARAVIS_H_

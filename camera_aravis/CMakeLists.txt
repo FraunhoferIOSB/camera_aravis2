@@ -38,11 +38,11 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(camera_aravis_msgs REQUIRED)
 
-find_package(Aravis REQUIRED)
+find_package(ARAVIS REQUIRED)
 find_package(GLIB2 REQUIRED)
 
 include_directories(include
-  ${Aravis_INCLUDE_DIRS}
+  ${ARAVIS_INCLUDE_DIRS}
   ${GLIB2_INCLUDE_DIRS}
 )
 
@@ -60,7 +60,7 @@ set(DEPENDENCIES
 )
 
 set(LIBRARIES
-  ${Aravis_LIBRARIES}
+  ${ARAVIS_LIBRARIES}
   glib-2.0
   gmodule-2.0
   gobject-2.0
@@ -96,8 +96,16 @@ install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_copyright REQUIRED)
+  ament_copyright()
+  find_package(ament_cmake_cppcheck REQUIRED)
+  ament_cppcheck()
+  find_package(ament_cmake_cpplint REQUIRED)
+  ament_cpplint(FILTERS -whitespace/newline,-readability/braces,-readability/todo)
+  find_package(ament_cmake_flake8 REQUIRED)
+  ament_flake8()
+  find_package(ament_cmake_lint_cmake REQUIRED)
+  ament_lint_cmake()
 endif()
 
 ament_package()

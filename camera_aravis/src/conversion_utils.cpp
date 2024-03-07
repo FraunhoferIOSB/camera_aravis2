@@ -116,7 +116,9 @@ void shift(uint16_t* data, const size_t length, const size_t digits)
 }
 
 //==================================================================================================
-[[nodiscard]] bool unpack10p32Img(sensor_msgs::msg::Image::SharedPtr& in, sensor_msgs::msg::Image::SharedPtr& out, const std::string out_format)
+[[nodiscard]] bool unpack10p32Img(sensor_msgs::msg::Image::SharedPtr& in,
+                                  sensor_msgs::msg::Image::SharedPtr& out,
+                                  const std::string out_format)
 {
     if (!in)
         return false;
@@ -143,7 +145,6 @@ void shift(uint16_t* data, const size_t length, const size_t digits)
     // unpack a full RGB pixel per iteration
     for (size_t i = 0; i < in->data.size() / 4; ++i)
     {
-
         std::memcpy(to, from, 2);
         to[0] <<= 6;
 
@@ -195,7 +196,6 @@ void shift(uint16_t* data, const size_t length, const size_t digits)
     // unpack a RGB pixel per iteration
     for (size_t i = 0; i < in->data.size() / 4; ++i)
     {
-
         to[0] = from[0] << 6;
         to[1] = from[3];
         to[2] = (from[0] & 0b00001100) << 4;
@@ -241,7 +241,6 @@ void shift(uint16_t* data, const size_t length, const size_t digits)
     // unpack 4 mono pixels per iteration
     for (size_t i = 0; i < in->data.size() / 5; ++i)
     {
-
         std::memcpy(to, from, 2);
         to[0] <<= 6;
 
@@ -296,7 +295,6 @@ void shift(uint16_t* data, const size_t length, const size_t digits)
     // unpack 4 mono pixels per iteration
     for (size_t i = 0; i < in->data.size() / 3; ++i)
     {
-
         to[0] = from[1] << 6;
         to[1] = from[0];
 
@@ -341,7 +339,6 @@ void shift(uint16_t* data, const size_t length, const size_t digits)
     // unpack 2 values per iteration
     for (size_t i = 0; i < in->data.size() / 3; ++i)
     {
-
         std::memcpy(to, from, 2);
         to[0] <<= 4;
 
@@ -388,7 +385,6 @@ void shift(uint16_t* data, const size_t length, const size_t digits)
     // unpack 2 values per iteration
     for (size_t i = 0; i < in->data.size() / 3; ++i)
     {
-
         to[0] = from[1] << 4;
         to[1] = from[0];
 
@@ -449,4 +445,4 @@ void shift(uint16_t* data, const size_t length, const size_t digits)
     return true;
 }
 
-} // end namespace camera_aravis
+}  // end namespace camera_aravis

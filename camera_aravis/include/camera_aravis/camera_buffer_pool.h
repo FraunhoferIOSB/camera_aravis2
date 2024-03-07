@@ -25,7 +25,7 @@
 // Aravis
 extern "C"
 {
-#include "arv.h"
+#include "aravis-0.8/arv.h"
 }
 
 // ROS
@@ -46,8 +46,8 @@ class CameraBufferPool : public std::enable_shared_from_this<CameraBufferPool>
     //
     // logger: logger object
     // stream: weakly managed pointer to the stream. Used to register all allocated buffers
-    // payload_size_bytes:	size of a single buffer
-    // n_preallocated_buffers:	number of initially allocated and registered buffers
+    // payload_size_bytes: size of a single buffer
+    // n_preallocated_buffers: number of initially allocated and registered buffers
     CameraBufferPool(const rclcpp::Logger& logger, ArvStream* stream,
                      size_t payload_size_bytes, size_t n_preallocated_buffers = 2);
     virtual ~CameraBufferPool();
@@ -106,6 +106,6 @@ class CameraBufferPool : public std::enable_shared_from_this<CameraBufferPool>
     rclcpp::Logger logger_;
 };
 
-} // namespace camera_aravis
+}  // namespace camera_aravis
 
-#endif // CAMERA_ARAVIS__CAMERA_BUFFER_POOL_H_
+#endif  // CAMERA_ARAVIS__CAMERA_BUFFER_POOL_H_

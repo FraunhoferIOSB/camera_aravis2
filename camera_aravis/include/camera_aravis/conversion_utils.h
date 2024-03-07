@@ -18,6 +18,8 @@
 
 // Std
 #include <functional>
+#include <map>
+#include <string>
 
 // ROS
 #include <sensor_msgs/image_encodings.hpp>
@@ -239,13 +241,17 @@ const std::map<std::string, ConversionFunction> CONVERSIONS_DICTIONARY =
                                sensor_msgs::image_encodings::MONO16)},
     {"Mono12Packed", std::bind(&unpack12PackedImg, std::placeholders::_1, std::placeholders::_2,
                                sensor_msgs::image_encodings::MONO16)},
-    {"BayerRG10Packed", std::bind(&unpack10PackedMonoImg, std::placeholders::_1, std::placeholders::_2,
+    {"BayerRG10Packed", std::bind(&unpack10PackedMonoImg,
+                                  std::placeholders::_1, std::placeholders::_2,
                                   sensor_msgs::image_encodings::BAYER_RGGB16)},
-    {"BayerBG10Packed", std::bind(&unpack10PackedMonoImg, std::placeholders::_1, std::placeholders::_2,
+    {"BayerBG10Packed", std::bind(&unpack10PackedMonoImg,
+                                  std::placeholders::_1, std::placeholders::_2,
                                   sensor_msgs::image_encodings::BAYER_BGGR16)},
-    {"BayerGB10Packed", std::bind(&unpack10PackedMonoImg, std::placeholders::_1, std::placeholders::_2,
+    {"BayerGB10Packed", std::bind(&unpack10PackedMonoImg,
+                                  std::placeholders::_1, std::placeholders::_2,
                                   sensor_msgs::image_encodings::BAYER_GBRG16)},
-    {"BayerGR10Packed", std::bind(&unpack10PackedMonoImg, std::placeholders::_1, std::placeholders::_2,
+    {"BayerGR10Packed", std::bind(&unpack10PackedMonoImg,
+                                  std::placeholders::_1, std::placeholders::_2,
                                   sensor_msgs::image_encodings::BAYER_GRBG16)},
     {"BayerRG12Packed", std::bind(&unpack12PackedImg, std::placeholders::_1, std::placeholders::_2,
                                   sensor_msgs::image_encodings::BAYER_RGGB16)},
@@ -258,6 +264,6 @@ const std::map<std::string, ConversionFunction> CONVERSIONS_DICTIONARY =
     {"YUV422Packed", std::bind(&renameImg, std::placeholders::_1, std::placeholders::_2,
                                sensor_msgs::image_encodings::YUV422)}};
 
-} // end namespace camera_aravis
+}  // end namespace camera_aravis
 
-#endif // CAMERA_ARAVIS__CONVERSION_UTILS_H_
+#endif  // CAMERA_ARAVIS__CONVERSION_UTILS_H_

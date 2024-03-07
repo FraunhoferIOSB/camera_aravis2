@@ -92,6 +92,6 @@ class ConcurrentQueue
     mutable std::mutex mtx_;
 };
 
-} // namespace camera_aravis
+}  // namespace camera_aravis
 
-#endif // CAMERA_ARAVIS__CONCURRENT_QUEUE_HPP_
+#endif  // CAMERA_ARAVIS__CONCURRENT_QUEUE_HPP_

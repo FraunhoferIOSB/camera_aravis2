@@ -22,12 +22,13 @@ from launch_ros.actions import Node
 
 os.environ['RCUTILS_CONSOLE_OUTPUT_FORMAT'] = '{time}: [{name}] [{severity}]\t{message}'
 # Verbose log:
-# os.environ['RCUTILS_CONSOLE_OUTPUT_FORMAT'] = '{time}: [{name}] [{severity}]\t{message} ({function_name}() at {file_name}:{line_number})'
+# os.environ['RCUTILS_CONSOLE_OUTPUT_FORMAT'] = '{time}: [{name}] [{severity}]\t{message} '
+# '({function_name}() at {file_name}:{line_number})'
+
 
 # Start as node:
-
 def generate_launch_description():
-    
+
     example_package_node = Node(
         name="camera_aravis_example",
         package="camera_aravis",
@@ -37,13 +38,13 @@ def generate_launch_description():
         # arguments=['--ros-args', '--log-level', 'debug'],
         parameters=[
                 {
-                "guid": "Allied Vision-Alvium G1-240c-05P3C",
-                "stream_names": ["vis"],
-                "pixel_formats": ["BayerRG8"],
-                "camera_info_urls": ["file://" + os.path.join(
-                    get_package_share_directory('camera_aravis'),
-                    'config/camera_info_example.yaml')],
-                "frame_rate": 5.0
+                    "guid": "Allied Vision-Alvium G1-240c-05P3C",
+                    "stream_names": ["vis"],
+                    "pixel_formats": ["BayerRG8"],
+                    "camera_info_urls": ["file://" + os.path.join(
+                        get_package_share_directory('camera_aravis'),
+                        'config/camera_info_example.yaml')],
+                    "frame_rate": 5.0
                 }
             ]
     )
