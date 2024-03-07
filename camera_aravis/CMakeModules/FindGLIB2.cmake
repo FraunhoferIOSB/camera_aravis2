@@ -1,24 +1,17 @@
-# - Try to find GLib2
-# Once done this will define
+# Copyright (c) 2024 Fraunhofer IOSB and contributors
 #
-#  GLIB2_FOUND - system has GLib2
-#  GLIB2_INCLUDE_DIRS - the GLib2 include directory
-#  GLIB2_LIBRARIES - Link these to use GLib2
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-#  HAVE_GLIB_GREGEX_H  glib has gregex.h header and
-#                      supports g_regex_match_simple
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
 #
-#  Copyright (c) 2006 Andreas Schneider <mail@cynapses.org>
-#  Copyright (c) 2006 Philippe Bernery <philippe.bernery@gmail.com>
-#  Copyright (c) 2007 Daniel Gollub <dgollub@suse.de>
-#  Copyright (c) 2007 Alban Browaeys <prahal@yahoo.com>
-#  Copyright (c) 2008 Michael Bell <michael.bell@web.de>
-#  Copyright (c) 2008 Bjoern Ricks <bjoern.ricks@googlemail.com>
-#
-#  Redistribution and use is allowed according to the terms of the New
-#  BSD license.
-#  For details see the accompanying COPYING-CMAKE-SCRIPTS file.
-#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 IF (GLIB2_LIBRARIES AND GLIB2_INCLUDE_DIRS )
