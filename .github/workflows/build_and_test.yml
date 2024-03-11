@@ -5,7 +5,7 @@ name: CI
 
 on: # this determines when this workflow is run
   push:
-    branches: [ main, devel, ci ]
+    branches: [ main, devel ]
   pull_request:
     branches: [ main, devel ] # when there is a pull request against master
   workflow_dispatch: # allow manually starting this workflow
