@@ -18,7 +18,7 @@ jobs:
       # fail-fast: false # uncomment if failing jobs should not cancel the others immediately
       matrix: # matrix is the product of entries
         ROS_DISTRO: [iron]
-        ROS_REPO: [testing, main]
+        ROS_REPO: [main]
     env:
       ADDITIONAL_DEBS: "libaravis-dev" # List the name of DEB(s delimitted by whitespace if multiple DEBs specified). Needs to be full-qualified Ubuntu package name.
       CCACHE_DIR: "${{ github.workspace }}/.ccache" # directory for ccache (and how we enable ccache in industrial_ci)
