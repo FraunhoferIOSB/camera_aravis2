@@ -18,7 +18,7 @@
 // Std
 #include <functional>
 
-namespace camera_aravis
+namespace camera_aravis2
 {
 
 //==================================================================================================
@@ -169,4 +169,4 @@ void CameraBufferPool::push(sensor_msgs::msg::Image* p_img)
     }
 }
 
-}  // namespace camera_aravis
+}  // namespace camera_aravis2

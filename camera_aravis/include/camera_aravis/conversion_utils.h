@@ -25,7 +25,7 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
-namespace camera_aravis
+namespace camera_aravis2
 {
 
 // Conversion functions from GenICam to ROS formats
@@ -264,6 +264,6 @@ const std::map<std::string, ConversionFunction> CONVERSIONS_DICTIONARY =
     {"YUV422Packed", std::bind(&renameImg, std::placeholders::_1, std::placeholders::_2,
                                sensor_msgs::image_encodings::YUV422)}};
 
-}  // end namespace camera_aravis
+}  // end namespace camera_aravis2
 
 #endif  // CAMERA_ARAVIS__CONVERSION_UTILS_H_

@@ -32,7 +32,7 @@ extern "C"
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
-namespace camera_aravis
+namespace camera_aravis2
 {
 
 class CameraBufferPool : public std::enable_shared_from_this<CameraBufferPool>
@@ -106,6 +106,6 @@ class CameraBufferPool : public std::enable_shared_from_this<CameraBufferPool>
     rclcpp::Logger logger_;
 };
 
-}  // namespace camera_aravis
+}  // namespace camera_aravis2
 
 #endif  // CAMERA_ARAVIS__CAMERA_BUFFER_POOL_H_

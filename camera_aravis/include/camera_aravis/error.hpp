@@ -42,7 +42,7 @@
     if (err)                      \
         err.log(logger);
 
-namespace camera_aravis
+namespace camera_aravis2
 {
 
 class GuardedGError
@@ -111,6 +111,6 @@ bool operator!=(const GuardedGError& lhs, std::nullptr_t)
     return !!lhs;
 }
 
-}  // namespace camera_aravis
+}  // namespace camera_aravis2
 
 #endif  // CAMERA_ARAVIS__ERROR_HPP_

@@ -16,13 +16,13 @@
 // ROS
 #include <rclcpp/rclcpp.hpp>
 
-// camera_aravis
+// camera_aravis2
 #include "../include/camera_aravis/camera_aravis.h"
 
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<camera_aravis::CameraAravis>();
+    auto node = std::make_shared<camera_aravis2::CameraAravis>();
     if (node->is_spawning_or_initialized())
     {
         rclcpp::spin(node->get_node_base_interface());

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 
-project(camera_aravis_msgs)
+project(camera_aravis2_msgs)
 
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)

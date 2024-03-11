@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(camera_aravis)
+project(camera_aravis2)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules)
 
@@ -36,7 +36,7 @@ find_package(camera_info_manager REQUIRED)
 
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(camera_aravis_msgs REQUIRED)
+find_package(camera_aravis2_msgs REQUIRED)
 
 find_package(ARAVIS REQUIRED)
 find_package(GLIB2 REQUIRED)
@@ -46,7 +46,7 @@ include_directories(include
   ${GLIB2_INCLUDE_DIRS}
 )
 
-set(EXECUTABLE_NAME camera_aravis)
+set(EXECUTABLE_NAME camera_aravis2)
 set(LIBRARY_NAME ${EXECUTABLE_NAME}_core)
 
 set(DEPENDENCIES
@@ -79,7 +79,7 @@ ament_target_dependencies(${LIBRARY_NAME} ${DEPENDENCIES})
 add_executable(${EXECUTABLE_NAME} src/main.cpp)
 target_link_libraries(${EXECUTABLE_NAME} ${LIBRARY_NAME})
 
-rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis::CameraAravis")
+rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraAravis")
 
 install(TARGETS ${LIBRARY_NAME}
   ARCHIVE DESTINATION lib

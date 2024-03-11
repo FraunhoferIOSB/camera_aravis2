@@ -18,7 +18,7 @@
 // ROS
 #include <rclcpp/rclcpp.hpp>
 
-namespace camera_aravis
+namespace camera_aravis2
 {
 
 //==================================================================================================
@@ -445,4 +445,4 @@ void shift(uint16_t* data, const size_t length, const size_t digits)
     return true;
 }
 
-}  // end namespace camera_aravis
+}  // namespace camera_aravis2

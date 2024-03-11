@@ -20,7 +20,7 @@
 #include <iostream>
 #include <thread>
 
-// camera_aravis
+// camera_aravis2
 #include "../include/camera_aravis/conversion_utils.h"
 
 // #define MULTITHREAD_INSPECTION
@@ -51,7 +51,7 @@ static std::chrono::time_point<std::chrono::system_clock> start;
 static int count = 0;
 #endif
 
-namespace camera_aravis
+namespace camera_aravis2
 {
 
 //==================================================================================================
@@ -635,7 +635,7 @@ void CameraAravis::spawn_camera_streams()
     //--- if no streams are opened, shut down
     if (num_opened_streams == 0)
     {
-        RCLCPP_FATAL(logger_, "camera_aravis failed to open streams for camera %s.",
+        RCLCPP_FATAL(logger_, "Failed to open streams for camera %s.",
                      guid_.c_str());
         ASSERT_SUCCESS(false);
     }
@@ -665,7 +665,7 @@ void CameraAravis::spawn_camera_streams()
 
     //--- print final output message
     std::string camera_guid_str = construct_camera_guid_str(p_camera_);
-    RCLCPP_INFO(logger_, "Done initializing camera_aravis.");
+    RCLCPP_INFO(logger_, "Done initializing.");
     RCLCPP_INFO(logger_, "\tCamera: %s", camera_guid_str.c_str());
     RCLCPP_INFO(logger_, "\tNum. Streams: (%i / %i)",
                 num_opened_streams, static_cast<int>(streams_.size()));
@@ -930,11 +930,11 @@ void CameraAravis::handle_new_buffer_signal(ArvStream* p_stream, gpointer p_user
     stream.buffer_queue.push(std::make_tuple(p_arv_buffer, p_img_msg));
 }
 
-}  // end namespace camera_aravis
+}  // end namespace camera_aravis2
 
 #include "rclcpp_components/register_node_macro.hpp"
 
 // Register the component with class_loader.
 // This acts as a sort of entry point, allowing the component to be discoverable when its library
 // is being loaded into a running process.
-RCLCPP_COMPONENTS_REGISTER_NODE(camera_aravis::CameraAravis)
+RCLCPP_COMPONENTS_REGISTER_NODE(camera_aravis2::CameraAravis)

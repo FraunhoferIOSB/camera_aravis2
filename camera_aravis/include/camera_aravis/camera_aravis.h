@@ -34,13 +34,13 @@ extern "C"
 #include <image_transport/image_transport.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-// camera_aravis
+// camera_aravis2
 #include "camera_aravis/camera_buffer_pool.h"
 #include "camera_aravis/concurrent_queue.hpp"
 #include "camera_aravis/conversion_utils.h"
 #include "camera_aravis/error.hpp"
 
-namespace camera_aravis
+namespace camera_aravis2
 {
 class CameraAravis : public rclcpp::Node
 {
@@ -302,6 +302,6 @@ class CameraAravis : public rclcpp::Node
     bool use_ptp_timestamp_;
 };
 
-}  // namespace camera_aravis
+}  // namespace camera_aravis2
 
 #endif  // CAMERA_ARAVIS__CAMERA_ARAVIS_H_
