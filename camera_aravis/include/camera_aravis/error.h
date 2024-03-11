@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef CAMERA_ARAVIS__ERROR_HPP_
-#define CAMERA_ARAVIS__ERROR_HPP_
+#ifndef CAMERA_ARAVIS__ERROR_H_
+#define CAMERA_ARAVIS__ERROR_H_
 
 // GLib
-#include <glib-2.0/glib/gerror.h>
+#include <glib-2.0/glib.h>
 
 // Std
 #include <string>
@@ -49,48 +49,19 @@ class GuardedGError
 {
     //--- METHOD DECLARATION ---//
   public:
-    ~GuardedGError()
-    {
-        reset();
-    }
+    GuardedGError() = default;
 
-    void reset()
-    {
-        if (!err)
-            return;
-        g_error_free(err);
-        err = nullptr;
-    }
+    ~GuardedGError();
 
-    GError** ref()
-    {
-        this->reset();
+    void reset();
 
-        return &err;
-    }
+    GError** ref();
 
-    GError* operator->() noexcept
-    {
-        return err;
-    }
+    GError* operator->() noexcept;
 
-    operator bool() const
-    {
-        return nullptr != err;
-    }
+    operator bool() const;
 
-    void log(const rclcpp::Logger& logger) const
-    {
-        if (err == nullptr)
-            return;
-
-        RCLCPP_ERROR(logger, "[%s] Code %i: %s",
-                     g_quark_to_string(err->domain), err->code, err->message);
-    }
-
-    friend bool operator==(const GuardedGError& lhs, const GError* rhs);
-    friend bool operator==(const GuardedGError& lhs, const GuardedGError& rhs);
-    friend bool operator!=(const GuardedGError& lhs, std::nullptr_t);
+    void log(const rclcpp::Logger& logger) const;
 
     //--- MEMBER DECLARATION ---//
 
@@ -98,19 +69,6 @@ class GuardedGError
     GError* err = nullptr;
 };
 
-bool operator==(const GuardedGError& lhs, const GError* rhs)
-{
-    return lhs.err == rhs;
-}
-bool operator==(const GuardedGError& lhs, const GuardedGError& rhs)
-{
-    return lhs.err == rhs.err;
-}
-bool operator!=(const GuardedGError& lhs, std::nullptr_t)
-{
-    return !!lhs;
-}
-
 }  // namespace camera_aravis2
 
-#endif  // CAMERA_ARAVIS__ERROR_HPP_
+#endif  // CAMERA_ARAVIS__ERROR_H_

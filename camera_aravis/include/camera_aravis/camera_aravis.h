@@ -38,7 +38,6 @@ extern "C"
 #include "camera_aravis/camera_buffer_pool.h"
 #include "camera_aravis/concurrent_queue.hpp"
 #include "camera_aravis/conversion_utils.h"
-#include "camera_aravis/error.hpp"
 
 namespace camera_aravis2
 {

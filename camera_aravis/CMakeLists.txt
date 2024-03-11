@@ -46,8 +46,9 @@ include_directories(include
   ${GLIB2_INCLUDE_DIRS}
 )
 
-set(EXECUTABLE_NAME camera_aravis2)
-set(LIBRARY_NAME ${EXECUTABLE_NAME}_core)
+# Library
+
+set(LIBRARY_NAME ${PROJECT_NAME}_core)
 
 set(DEPENDENCIES
   rclcpp
@@ -72,14 +73,27 @@ add_library(${LIBRARY_NAME} SHARED
   src/camera_aravis.cpp
   src/camera_buffer_pool.cpp
   src/conversion_utils.cpp
+  src/error.cpp
+  src/genicam_xml_exporter.cpp
 )
 target_link_libraries(${LIBRARY_NAME} ${LIBRARIES})
 ament_target_dependencies(${LIBRARY_NAME} ${DEPENDENCIES})
 
-add_executable(${EXECUTABLE_NAME} src/main.cpp)
-target_link_libraries(${EXECUTABLE_NAME} ${LIBRARY_NAME})
+# camera_aravis node
 
+set(CAMERA_ARAVIS_EXEC_NAME camera_aravis)
+add_executable(${CAMERA_ARAVIS_EXEC_NAME} src/camera_aravis_main.cpp)
+target_link_libraries(${CAMERA_ARAVIS_EXEC_NAME} ${LIBRARY_NAME})
 rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraAravis")
+
+# genicam_xml_exporter node
+
+set(EXPORT_GENICAM_XML_EXEC_NAME genicam_xml_exporter)
+add_executable(${EXPORT_GENICAM_XML_EXEC_NAME} src/genicam_xml_exporter_main.cpp)
+target_link_libraries(${EXPORT_GENICAM_XML_EXEC_NAME} ${LIBRARY_NAME})
+rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::GenICamXmlExporter")
+
+# Installs
 
 install(TARGETS ${LIBRARY_NAME}
   ARCHIVE DESTINATION lib
@@ -87,13 +101,15 @@ install(TARGETS ${LIBRARY_NAME}
   RUNTIME DESTINATION bin
 )
 
-install(TARGETS ${EXECUTABLE_NAME}
+install(TARGETS ${CAMERA_ARAVIS_EXEC_NAME} ${EXPORT_GENICAM_XML_EXEC_NAME}
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/ DESTINATION include/)
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+
+# Tests
 
 if(BUILD_TESTING)
   find_package(ament_cmake_copyright REQUIRED)

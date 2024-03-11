@@ -21,23 +21,11 @@
 #include <thread>
 
 // camera_aravis2
+#include "../include/camera_aravis/common.h"
 #include "../include/camera_aravis/conversion_utils.h"
+#include "../include/camera_aravis/error.h"
 
 // #define MULTITHREAD_INSPECTION
-
-// Macro to assert success of given function
-#define ASSERT_SUCCESS(fn) \
-    if (!fn)               \
-    {                      \
-        return;            \
-    }
-// Macro to assert success of given function and shut down if not successful
-#define ASSERT_SUCCESS_AND_SHUTDOWN(fn) \
-    if (!fn)                            \
-    {                                   \
-        rclcpp::shutdown();             \
-        return;                         \
-    }
 
 // Conversions from integers to Arv types.
 static const char* arvBufferStatusFromInt[] =
