@@ -19,7 +19,7 @@ jobs:
           - {ROS_DISTRO: rolling, ROS_REPO: main}
     runs-on: ubuntu-latest
     env:
-      - ADDITIONAL_DEBS='libaravis-dev'
+      ADDITIONAL_DEBS: "libaravis-dev"
     steps:
       - uses: actions/checkout@v3
       - uses: 'ros-industrial/industrial_ci@master'
