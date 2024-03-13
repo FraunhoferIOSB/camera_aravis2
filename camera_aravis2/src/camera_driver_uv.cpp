@@ -26,62 +26,35 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef CAMERA_ARAVIS__ERROR_H_
-#define CAMERA_ARAVIS__ERROR_H_
+#include "../include/camera_aravis2/camera_driver_uv.h"
 
-// GLib
-#include <glib-2.0/glib.h>
-
-// Std
-#include <string>
-
-// ROS
-#include <rclcpp/rclcpp.hpp>
-
-/// Macro to assert success and log GError if necessary
-#define ASSERT_GERROR(err, logger, success) \
-    if (err)                                \
-    {                                       \
-        success &= false;                   \
-        err.log(logger);                    \
-    }                                       \
-    else                                    \
-    {                                       \
-        success &= true;                    \
-    }
-
-/// Macro to check if error occurred and log if necessary
-#define CHECK_GERROR(err, logger) \
-    if (err)                      \
-        err.log(logger);
+// camera_aravis2
+#include "../include/camera_aravis2/common.h"
 
 namespace camera_aravis2
 {
 
-class GuardedGError
+//==================================================================================================
+CameraDriverUv::CameraDriverUv(const rclcpp::NodeOptions& options) :
+  CameraAravisNodeBase("camera_driver_uv", options)
 {
-    //--- METHOD DECLARATION ---//
-  public:
-    GuardedGError() = default;
+    RCLCPP_FATAL(logger_, "USB3 Devices are currently not supported.");
+    RCLCPP_FATAL(logger_,
+                 "Help Wanted: https://github.com/FraunhoferIOSB/camera_aravis2/issues/14");
+    return;
+}
 
-    ~GuardedGError();
+//==================================================================================================
+CameraDriverUv::~CameraDriverUv()
+{
+    //--- camera / device object is unreferences in parent class
+}
 
-    void reset();
+}  // end namespace camera_aravis2
 
-    GError** ref();
+#include "rclcpp_components/register_node_macro.hpp"
 
-    GError* operator->() noexcept;
-
-    operator bool() const;
-
-    void log(const rclcpp::Logger& logger) const;
-
-    //--- MEMBER DECLARATION ---//
-
-  private:
-    GError* err = nullptr;
-};
-
-}  // namespace camera_aravis2
-
-#endif  // CAMERA_ARAVIS__ERROR_H_
+// Register the component with class_loader.
+// This acts as a sort of entry point, allowing the component to be discoverable when its library
+// is being loaded into a running process.
+RCLCPP_COMPONENTS_REGISTER_NODE(camera_aravis2::CameraDriverUv)

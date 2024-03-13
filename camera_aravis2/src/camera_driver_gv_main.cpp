@@ -30,12 +30,12 @@
 #include <rclcpp/rclcpp.hpp>
 
 // camera_aravis2
-#include "../include/camera_aravis/camera_aravis.h"
+#include "../include/camera_aravis2/camera_driver_gv.h"
 
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<camera_aravis2::CameraAravis>();
+    auto node = std::make_shared<camera_aravis2::CameraDriverGv>();
     if (node->is_spawning_or_initialized())
     {
         rclcpp::spin(node->get_node_base_interface());

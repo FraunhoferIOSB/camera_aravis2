@@ -41,9 +41,9 @@ os.environ['RCUTILS_CONSOLE_OUTPUT_FORMAT'] = '{time}: [{name}] [{severity}]\t{m
 def generate_launch_description():
 
     example_package_node = Node(
-        name="camera_aravis2_example",
+        name="camera_xml_exporter_example",
         package="camera_aravis2",
-        executable="genicam_xml_exporter",
+        executable="camera_xml_exporter",
         output='screen',
         emulate_tty=True,
         # arguments=['--ros-args', '--log-level', 'debug'],

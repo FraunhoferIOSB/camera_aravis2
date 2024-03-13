@@ -26,8 +26,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef CAMERA_ARAVIS__CAMERA_ARAVIS_H_
-#define CAMERA_ARAVIS__CAMERA_ARAVIS_H_
+#ifndef CAMERA_ARAVIS2__CAMERA_DRIVER_GV_H_
+#define CAMERA_ARAVIS2__CAMERA_DRIVER_GV_H_
 
 // Std
 #include <memory>
@@ -48,13 +48,14 @@ extern "C"
 #include <rclcpp/rclcpp.hpp>
 
 // camera_aravis2
-#include "camera_aravis/camera_buffer_pool.h"
-#include "camera_aravis/concurrent_queue.hpp"
-#include "camera_aravis/conversion_utils.h"
+#include "camera_aravis2/camera_aravis_node_base.h"
+#include "camera_aravis2/concurrent_queue.hpp"
+#include "camera_aravis2/conversion_utils.h"
+#include "camera_aravis2/image_buffer_pool.h"
 
 namespace camera_aravis2
 {
-class CameraAravis : public rclcpp::Node
+class CameraDriverGv : public CameraAravisNodeBase
 {
     //--- STRUCT DECLARATION ---//
 
@@ -98,7 +99,7 @@ class CameraAravis : public rclcpp::Node
          */
         Stream() :
           p_arv_stream(nullptr),
-          p_buffer_pool(CameraBufferPool::SharedPtr()),
+          p_buffer_pool(ImageBufferPool::SharedPtr()),
           name(""),
           sensor(Sensor()),
           p_camera_info_manager(nullptr),
@@ -111,7 +112,7 @@ class CameraAravis : public rclcpp::Node
         ArvStream* p_arv_stream;
 
         /// Shared pointer to buffer pool.
-        CameraBufferPool::SharedPtr p_buffer_pool;
+        ImageBufferPool::SharedPtr p_buffer_pool;
 
         /// Name of stream.
         std::string name;
@@ -153,31 +154,24 @@ class CameraAravis : public rclcpp::Node
      *
      * @param[in] options Node options.
      */
-    explicit CameraAravis(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
+    explicit CameraDriverGv(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
     /**
      * @brief Default destructor.
      *
      */
-    ~CameraAravis() override;
+    virtual ~CameraDriverGv();
 
     /**
      * @brief Returns true, if node is spawning or is initialized. False, otherwise.
      */
     bool is_spawning_or_initialized() const;
 
-  private:
+  protected:
     /**
      * @brief Set the up launch parameters.
      */
-    void setup_parameters();
-
-    /**
-     * @brief Discover attached camera devices found by Aravis and open device specified by guid.
-     *
-     * @return True if successful. False, otherwise.
-     */
-    [[nodiscard]] bool discover_and_open_camera_device();
+    void setup_parameters() override;
 
     /**
      * @brief Set up camera stream structs. Here, the number of streams available are discovered,
@@ -258,22 +252,6 @@ class CameraAravis : public rclcpp::Node
 
   protected:
     /**
-     * @brief Construct GUID string of given camera, using vendor name, model name and
-     * device serial number.
-     *
-     * @return GUID in the format: <vendor_name>-<model_name>-<device_sn | device_id>.
-     */
-    static inline std::string construct_camera_guid_str(ArvCamera* p_cam);
-
-    /**
-     * @brief Handle 'control-lost' signal emitted by aravis.
-     *
-     * @param[in] p_device Pointer to aravis device.
-     * @param[in] p_user_data Pointer to associated user data.
-     */
-    static void handle_control_lost_signal(ArvDevice* p_device, gpointer p_user_data);
-
-    /**
      * @brief Handle 'new-buffer' signal emitted by aravis, notifying that a new buffer is ready.
      *
      * @param[in] p_device Pointer to aravis device.
@@ -282,22 +260,8 @@ class CameraAravis : public rclcpp::Node
     static void handle_new_buffer_signal(ArvStream* p_stream, gpointer p_user_data);
 
     //--- MEMBER DECLARATION ---//
-  private:
-    /// Flag indicating if node is initialized.
-    bool is_initialized_;
 
-    /// Logger object of node.
-    rclcpp::Logger logger_;
-
-    /// Pointer to Aravis device.
-    ArvDevice* p_device_;
-
-    /// Pointer to Aravis camera.
-    ArvCamera* p_camera_;
-
-    /// GUID of camera.
-    std::string guid_;
-
+  protected:
     /// List of camera streams
     std::vector<Stream> streams_;
 
@@ -308,7 +272,7 @@ class CameraAravis : public rclcpp::Node
     std::thread spawn_stream_thread_;
 
     /// List of pointers to data tuples for the new-buffer callback.
-    std::vector<std::shared_ptr<std::tuple<CameraAravis*, uint>>> new_buffer_cb_data_ptrs;
+    std::vector<std::shared_ptr<std::tuple<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;
 
     /// Flag indicating to use PTP timestamp.
     bool use_ptp_timestamp_;
@@ -316,4 +280,4 @@ class CameraAravis : public rclcpp::Node
 
 }  // namespace camera_aravis2
 
-#endif  // CAMERA_ARAVIS__CAMERA_ARAVIS_H_
+#endif  // CAMERA_ARAVIS2__CAMERA_DRIVER_GV_H_

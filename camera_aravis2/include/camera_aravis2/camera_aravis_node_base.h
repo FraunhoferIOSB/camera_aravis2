@@ -26,11 +26,10 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef CAMERA_ARAVIS__GENICAM_XML_EXPORTER_H_
-#define CAMERA_ARAVIS__GENICAM_XML_EXPORTER_H_
+#ifndef CAMERA_ARAVIS2__CAMERA_ARAVIS_NODE_BASE_H_
+#define CAMERA_ARAVIS2__CAMERA_ARAVIS_NODE_BASE_H_
 
 // Std
-#include <filesystem>
 #include <string>
 
 // Aravis
@@ -40,14 +39,12 @@ extern "C"
 }
 
 // ROS
-#include <camera_info_manager/camera_info_manager.hpp>
-#include <image_transport/image_transport.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 namespace camera_aravis2
 {
 
-class GenICamXmlExporter : public rclcpp::Node
+class CameraAravisNodeBase : public rclcpp::Node
 {
     //--- METHOD DECLARATION ---//
 
@@ -55,21 +52,28 @@ class GenICamXmlExporter : public rclcpp::Node
     /**
      * @brief Initialization constructor
      *
+     * @param[in] name Node name.
      * @param[in] options Node options.
      */
-    explicit GenICamXmlExporter(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
+    explicit CameraAravisNodeBase(const std::string& name,
+                                  const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
     /**
      * @brief Default destructor.
      *
      */
-    ~GenICamXmlExporter() override;
+    virtual ~CameraAravisNodeBase();
 
-  private:
+    /**
+     * @brief Returns true, if node is is initialized. False, otherwise.
+     */
+    bool is_initialized() const;
+
+  protected:
     /**
      * @brief Set the up launch parameters.
      */
-    void setup_parameters();
+    virtual void setup_parameters();
 
     /**
      * @brief Discover attached camera devices found by Aravis and open device specified by guid.
@@ -77,13 +81,6 @@ class GenICamXmlExporter : public rclcpp::Node
      * @return True if successful. False, otherwise.
      */
     [[nodiscard]] bool discover_and_open_camera_device();
-
-    /**
-     * @brief Export XML data from camera and write to file.
-     *
-     * @return True if successful. False, otherwise.
-     */
-    [[nodiscard]] bool export_xml_data_to_file();
 
     //--- FUNCTION DECLARATION ---//
 
@@ -94,11 +91,22 @@ class GenICamXmlExporter : public rclcpp::Node
      *
      * @return GUID in the format: <vendor_name>-<model_name>-<device_sn | device_id>.
      */
-    static inline std::string construct_camera_guid_str(ArvCamera* p_cam);
+    static std::string construct_camera_guid_str(ArvCamera* p_cam);
+
+    /**
+     * @brief Handle 'control-lost' signal emitted by aravis.
+     *
+     * @param[in] p_device Pointer to aravis device.
+     * @param[in] p_user_data Pointer to associated user data.
+     */
+    static void handle_control_lost_signal(ArvDevice* p_device, gpointer p_user_data);
 
     //--- MEMBER DECLARATION ---//
 
-  private:
+  protected:
+    /// Flag indicating if node is initialized.
+    bool is_initialized_;
+
     /// Logger object of node.
     rclcpp::Logger logger_;
 
@@ -110,11 +118,8 @@ class GenICamXmlExporter : public rclcpp::Node
 
     /// GUID of camera.
     std::string guid_;
-
-    /// Path of output xml file.
-    std::filesystem::path xml_file_path_;
 };
 
 }  // namespace camera_aravis2
 
-#endif  // CAMERA_ARAVIS__GENICAM_XML_EXPORTER_H_
+#endif  // CAMERA_ARAVIS2__CAMERA_ARAVIS_NODE_BASE_H_

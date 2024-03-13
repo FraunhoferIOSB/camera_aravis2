@@ -26,7 +26,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "../include/camera_aravis/camera_buffer_pool.h"
+#include "../include/camera_aravis2/image_buffer_pool.h"
 
 // Std
 #include <functional>
@@ -35,32 +35,32 @@ namespace camera_aravis2
 {
 
 //==================================================================================================
-CameraBufferPool::CameraBufferPool(const rclcpp::Logger& logger,
-                                   ArvStream* stream,
-                                   size_t payload_size_bytes,
-                                   size_t n_preallocated_buffers) :
+ImageBufferPool::ImageBufferPool(const rclcpp::Logger& logger,
+                                 ArvStream* stream,
+                                 size_t payload_size_bytes,
+                                 size_t n_preallocated_buffers) :
   stream_(stream),
   payload_size_bytes_(payload_size_bytes),
   n_buffers_(0),
-  self_(this, [](CameraBufferPool*) {}),
+  self_(this, [](ImageBufferPool*) {}),
   logger_(logger)
 {
     allocateBuffers(n_preallocated_buffers);
 }
 
 //==================================================================================================
-CameraBufferPool::~CameraBufferPool()
+ImageBufferPool::~ImageBufferPool()
 {
 }
 
 //==================================================================================================
-sensor_msgs::msg::Image::SharedPtr CameraBufferPool::getRecyclableImg()
+sensor_msgs::msg::Image::SharedPtr ImageBufferPool::getRecyclableImg()
 {
     std::lock_guard<std::mutex> lock(mutex_);
     if (dangling_imgs_.empty())
     {
         return sensor_msgs::msg::Image::SharedPtr(new sensor_msgs::msg::Image,
-                                                  std::bind(&CameraBufferPool::reclaim,
+                                                  std::bind(&ImageBufferPool::reclaim,
                                                             this->weak_from_this(),
                                                             std::placeholders::_1));
     }
@@ -73,7 +73,7 @@ sensor_msgs::msg::Image::SharedPtr CameraBufferPool::getRecyclableImg()
 }
 
 //==================================================================================================
-sensor_msgs::msg::Image::SharedPtr CameraBufferPool::operator[](ArvBuffer* buffer)
+sensor_msgs::msg::Image::SharedPtr ImageBufferPool::operator[](ArvBuffer* buffer)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     sensor_msgs::msg::Image::SharedPtr img_ptr;
@@ -105,7 +105,7 @@ sensor_msgs::msg::Image::SharedPtr CameraBufferPool::operator[](ArvBuffer* buffe
 }
 
 //==================================================================================================
-void CameraBufferPool::allocateBuffers(size_t n)
+void ImageBufferPool::allocateBuffers(size_t n)
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -117,7 +117,7 @@ void CameraBufferPool::allocateBuffers(size_t n)
             p_img->data.resize(payload_size_bytes_);
             ArvBuffer* buffer = arv_buffer_new(payload_size_bytes_, p_img->data.data());
             sensor_msgs::msg::Image::SharedPtr img_ptr(p_img,
-                                                       std::bind(&CameraBufferPool::reclaim,
+                                                       std::bind(&ImageBufferPool::reclaim,
                                                                  this->weak_from_this(),
                                                                  std::placeholders::_1));
             available_img_buffers_.emplace(p_img->data.data(), img_ptr);
@@ -134,7 +134,7 @@ void CameraBufferPool::allocateBuffers(size_t n)
 }
 
 //==================================================================================================
-void CameraBufferPool::reclaim(const WeakPtr& self, sensor_msgs::msg::Image* p_img)
+void ImageBufferPool::reclaim(const WeakPtr& self, sensor_msgs::msg::Image* p_img)
 {
     SharedPtr s = self.lock();
     if (s)
@@ -148,7 +148,7 @@ void CameraBufferPool::reclaim(const WeakPtr& self, sensor_msgs::msg::Image* p_i
 }
 
 //==================================================================================================
-void CameraBufferPool::push(sensor_msgs::msg::Image* p_img)
+void ImageBufferPool::push(sensor_msgs::msg::Image* p_img)
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -159,7 +159,7 @@ void CameraBufferPool::push(sensor_msgs::msg::Image* p_img)
         if (ARV_IS_STREAM(stream_))
         {
             sensor_msgs::msg::Image::SharedPtr img_ptr(p_img,
-                                                       std::bind(&CameraBufferPool::reclaim,
+                                                       std::bind(&ImageBufferPool::reclaim,
                                                                  this->weak_from_this(),
                                                                  std::placeholders::_1));
             available_img_buffers_.emplace(p_img->data.data(), img_ptr);
@@ -176,7 +176,7 @@ void CameraBufferPool::push(sensor_msgs::msg::Image* p_img)
     {
         // this image was not an aravis registered buffer
         dangling_imgs_.emplace(p_img,
-                               std::bind(&CameraBufferPool::reclaim,
+                               std::bind(&ImageBufferPool::reclaim,
                                          this->weak_from_this(),
                                          std::placeholders::_1));
     }

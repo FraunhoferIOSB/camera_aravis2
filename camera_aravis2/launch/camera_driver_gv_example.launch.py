@@ -43,9 +43,9 @@ os.environ['RCUTILS_CONSOLE_OUTPUT_FORMAT'] = '{time}: [{name}] [{severity}]\t{m
 def generate_launch_description():
 
     example_package_node = Node(
-        name="camera_aravis2_example",
+        name="camera_driver_gv_example",
         package="camera_aravis2",
-        executable="camera_aravis",
+        executable="camera_driver_gv",
         output='screen',
         emulate_tty=True,
         # arguments=['--ros-args', '--log-level', 'debug'],
@@ -54,6 +54,7 @@ def generate_launch_description():
                     "guid": "Allied Vision-Alvium G1-240c-05P3C",
                     "stream_names": ["vis"],
                     "pixel_formats": ["BayerRG8"],
+                    "frame_id": "camera_gv",
                     "camera_info_urls": ["file://" + os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example.yaml')],

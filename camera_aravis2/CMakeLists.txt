@@ -70,28 +70,37 @@ set(LIBRARIES
 )
 
 add_library(${LIBRARY_NAME} SHARED
-  src/camera_aravis.cpp
-  src/camera_buffer_pool.cpp
+  src/camera_aravis_node_base.cpp
+  src/camera_driver_gv.cpp
+  src/camera_driver_uv.cpp
+  src/camera_xml_exporter.cpp
   src/conversion_utils.cpp
   src/error.cpp
-  src/genicam_xml_exporter.cpp
+  src/image_buffer_pool.cpp
 )
 target_link_libraries(${LIBRARY_NAME} ${LIBRARIES})
 ament_target_dependencies(${LIBRARY_NAME} ${DEPENDENCIES})
 
-# camera_aravis node
+# camera_driver_gv node
 
-set(CAMERA_ARAVIS_EXEC_NAME camera_aravis)
-add_executable(${CAMERA_ARAVIS_EXEC_NAME} src/camera_aravis_main.cpp)
-target_link_libraries(${CAMERA_ARAVIS_EXEC_NAME} ${LIBRARY_NAME})
-rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraAravis")
+set(CAMERA_DRIVER_GV_EXEC_NAME camera_driver_gv)
+add_executable(${CAMERA_DRIVER_GV_EXEC_NAME} src/camera_driver_gv_main.cpp)
+target_link_libraries(${CAMERA_DRIVER_GV_EXEC_NAME} ${LIBRARY_NAME})
+rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraDriverGv")
 
-# genicam_xml_exporter node
+# camera_driver_uv node
 
-set(EXPORT_GENICAM_XML_EXEC_NAME genicam_xml_exporter)
-add_executable(${EXPORT_GENICAM_XML_EXEC_NAME} src/genicam_xml_exporter_main.cpp)
-target_link_libraries(${EXPORT_GENICAM_XML_EXEC_NAME} ${LIBRARY_NAME})
-rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::GenICamXmlExporter")
+set(CAMERA_DRIVER_UV_EXEC_NAME camera_driver_uv)
+add_executable(${CAMERA_DRIVER_UV_EXEC_NAME} src/camera_driver_uv_main.cpp)
+target_link_libraries(${CAMERA_DRIVER_UV_EXEC_NAME} ${LIBRARY_NAME})
+rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraDriverUv")
+
+# camera_xml_exporter node
+
+set(CAMERA_XML_EXPORTER_EXEC_NAME camera_xml_exporter)
+add_executable(${CAMERA_XML_EXPORTER_EXEC_NAME} src/camera_xml_exporter_main.cpp)
+target_link_libraries(${CAMERA_XML_EXPORTER_EXEC_NAME} ${LIBRARY_NAME})
+rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraXmlExporter")
 
 # Installs
 
@@ -101,7 +110,8 @@ install(TARGETS ${LIBRARY_NAME}
   RUNTIME DESTINATION bin
 )
 
-install(TARGETS ${CAMERA_ARAVIS_EXEC_NAME} ${EXPORT_GENICAM_XML_EXEC_NAME}
+install(TARGETS
+  ${CAMERA_DRIVER_GV_EXEC_NAME} ${CAMERA_DRIVER_UV_EXEC_NAME} ${CAMERA_XML_EXPORTER_EXEC_NAME}
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 

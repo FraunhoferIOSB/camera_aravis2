@@ -26,17 +26,21 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// ROS
-#include <rclcpp/rclcpp.hpp>
+#ifndef CAMERA_ARAVIS2__COMMON_H_
+#define CAMERA_ARAVIS2__COMMON_H_
 
-// camera_aravis2
-#include "../include/camera_aravis/genicam_xml_exporter.h"
+// Macro to assert success of given function
+#define ASSERT_SUCCESS(fn) \
+    if (!fn)               \
+    {                      \
+        return;            \
+    }
+// Macro to assert success of given function and shut down if not successful
+#define ASSERT_SUCCESS_AND_SHUTDOWN(fn) \
+    if (!fn)                            \
+    {                                   \
+        rclcpp::shutdown();             \
+        return;                         \
+    }
 
-int main(int argc, char** argv)
-{
-    rclcpp::init(argc, argv);
-    auto node = std::make_shared<camera_aravis2::GenICamXmlExporter>();
-    rclcpp::shutdown();
-
-    return EXIT_SUCCESS;
-}
+#endif  // CAMERA_ARAVIS2__COMMON_H_

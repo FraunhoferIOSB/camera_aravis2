@@ -1,6 +1,6 @@
 image_width: 1936
 image_height: 1216
-camera_name: camera_aravis2_example_vis
+camera_name: camera_gv_vis
 camera_matrix:
   rows: 3
   cols: 3

@@ -26,7 +26,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "../include/camera_aravis/conversion_utils.h"
+#include "../include/camera_aravis2/conversion_utils.h"
 
 // ROS
 #include <rclcpp/rclcpp.hpp>

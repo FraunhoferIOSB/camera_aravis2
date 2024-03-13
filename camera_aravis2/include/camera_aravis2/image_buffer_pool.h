@@ -26,8 +26,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef CAMERA_ARAVIS__CAMERA_BUFFER_POOL_H_
-#define CAMERA_ARAVIS__CAMERA_BUFFER_POOL_H_
+#ifndef CAMERA_ARAVIS2__IMAGE_BUFFER_POOL_H_
+#define CAMERA_ARAVIS2__IMAGE_BUFFER_POOL_H_
 
 // Std
 #include <map>
@@ -48,29 +48,29 @@ extern "C"
 namespace camera_aravis2
 {
 
-class CameraBufferPool : public std::enable_shared_from_this<CameraBufferPool>
+class ImageBufferPool : public std::enable_shared_from_this<ImageBufferPool>
 {
   public:
-    typedef std::shared_ptr<CameraBufferPool> SharedPtr;
-    typedef std::weak_ptr<CameraBufferPool> WeakPtr;
+    typedef std::shared_ptr<ImageBufferPool> SharedPtr;
+    typedef std::weak_ptr<ImageBufferPool> WeakPtr;
 
-    // Note: If the CameraBufferPool is destroyed, buffers will be deallocated. Therefor, make sure
-    // that the CameraBufferPool stays alive longer than the given stream object.
+    // Note: If the ImageBufferPool is destroyed, buffers will be deallocated. Therefor, make sure
+    // that the ImageBufferPool stays alive longer than the given stream object.
     //
     // logger: logger object
     // stream: weakly managed pointer to the stream. Used to register all allocated buffers
     // payload_size_bytes: size of a single buffer
     // n_preallocated_buffers: number of initially allocated and registered buffers
-    CameraBufferPool(const rclcpp::Logger& logger, ArvStream* stream,
-                     size_t payload_size_bytes, size_t n_preallocated_buffers = 2);
-    virtual ~CameraBufferPool();
+    ImageBufferPool(const rclcpp::Logger& logger, ArvStream* stream,
+                    size_t payload_size_bytes, size_t n_preallocated_buffers = 2);
+    virtual ~ImageBufferPool();
 
     // Get an image whose lifespan is administrated by this pool (but not registered to the camera).
     sensor_msgs::msg::Image::SharedPtr getRecyclableImg();
 
     // Get the image message which wraps around the given ArvBuffer.
     //
-    // If this buffer is not administrated by this CameraBufferPool,
+    // If this buffer is not administrated by this ImageBufferPool,
     // a new image message is allocated and the contents of the buffer
     // are copied to it.
     sensor_msgs::msg::Image::SharedPtr operator[](ArvBuffer* buffer);
@@ -99,7 +99,7 @@ class CameraBufferPool : public std::enable_shared_from_this<CameraBufferPool>
   protected:
     // Custom deleter for aravis buffer wrapping image messages, which
     // either pushes the buffer back to the aravis stream cleans it up
-    // when the CameraBufferPool is gone.
+    // when the ImageBufferPool is gone.
     static void reclaim(const WeakPtr& self, sensor_msgs::msg::Image* p_img);
 
     // Push the buffer inside the given image back to the aravis stream,
@@ -121,4 +121,4 @@ class CameraBufferPool : public std::enable_shared_from_this<CameraBufferPool>
 
 }  // namespace camera_aravis2
 
-#endif  // CAMERA_ARAVIS__CAMERA_BUFFER_POOL_H_
+#endif  // CAMERA_ARAVIS2__IMAGE_BUFFER_POOL_H_

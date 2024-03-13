@@ -26,21 +26,44 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef CAMERA_ARAVIS__COMMON_H_
-#define CAMERA_ARAVIS__COMMON_H_
+#ifndef CAMERA_ARAVIS2__CAMERA_DRIVER_UV_H_
+#define CAMERA_ARAVIS2__CAMERA_DRIVER_UV_H_
 
-// Macro to assert success of given function
-#define ASSERT_SUCCESS(fn) \
-    if (!fn)               \
-    {                      \
-        return;            \
-    }
-// Macro to assert success of given function and shut down if not successful
-#define ASSERT_SUCCESS_AND_SHUTDOWN(fn) \
-    if (!fn)                            \
-    {                                   \
-        rclcpp::shutdown();             \
-        return;                         \
-    }
+// ROS
+#include <rclcpp/rclcpp.hpp>
 
-#endif  // CAMERA_ARAVIS__COMMON_H_
+// camera_aravis2
+#include "camera_aravis2/camera_aravis_node_base.h"
+
+namespace camera_aravis2
+{
+class CameraDriverUv : public CameraAravisNodeBase
+{
+    //--- METHOD DECLARATION ---//
+
+  public:
+    /**
+     * @brief Initialization constructor
+     *
+     * @param[in] options Node options.
+     */
+    explicit CameraDriverUv(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
+
+    /**
+     * @brief Default destructor.
+     *
+     */
+    virtual ~CameraDriverUv();
+
+  protected:
+    //--- FUNCTION DECLARATION ---//
+
+  protected:
+    //--- MEMBER DECLARATION ---//
+
+  protected:
+};
+
+}  // namespace camera_aravis2
+
+#endif  // CAMERA_ARAVIS2__CAMERA_DRIVER_UV_H_
