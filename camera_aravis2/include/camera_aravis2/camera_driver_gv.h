@@ -60,33 +60,60 @@ class CameraDriverGv : public CameraAravisNodeBase
     //--- STRUCT DECLARATION ---//
 
     /**
-     * @brief Struct implementing Sensor
+     * @brief Struct representing sensor
      */
     struct Sensor
     {
-        Sensor() :
-          frame_id(""),
-          width(0),
-          height(0),
-          pixel_format(""),
-          n_bits_pixel(0)
-        {
-        }
-
         /// Frame ID associated with the sensor.
-        std::string frame_id;
+        std::string frame_id = "";
 
         /// Width of the sensor in pixel.
-        int32_t width;
+        int32_t width = 0;
 
         /// Height of the sensor in pixel.
-        int32_t height;
+        int32_t height = 0;
 
         /// Pixel format associated ith the sensor.
-        std::string pixel_format;
+        std::string pixel_format = "";
 
         /// Number of pixel associated with the pixel format.
         size_t n_bits_pixel = 0;
+
+        /// Flip the image horizontally on the device.
+        bool reverse_x = false;
+
+        /// Flip the image vertically on the device.
+        bool reverse_y = false;
+    };
+
+    /**
+     * @brief Struct representing region of interest corresponding to image.
+     */
+    struct ImageRoi
+    {
+        /// Offset in x direction.
+        int x = 0;
+
+        /// Offset in y direction.
+        int y = 0;
+
+        /// Width of image.
+        int width = 0;
+
+        /// Minimum width of image.
+        int width_min = 0;
+
+        /// Maximum width of image.
+        int width_max = 0;
+
+        /// Height of image.
+        int height = 0;
+
+        /// Minimum height of image.
+        int height_min = 0;
+
+        /// Maximum height of image.
+        int height_max = 0;
     };
 
     /**
@@ -119,6 +146,9 @@ class CameraDriverGv : public CameraAravisNodeBase
 
         /// Sensor associated with the stream.
         Sensor sensor;
+
+        /// Image region associated with the stream.
+        ImageRoi image_roi;
 
         /// URL to camera info yaml file.
         std::string camera_info_url;
@@ -154,7 +184,8 @@ class CameraDriverGv : public CameraAravisNodeBase
      *
      * @param[in] options Node options.
      */
-    explicit CameraDriverGv(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
+    explicit CameraDriverGv(const rclcpp::NodeOptions& options =
+                              rclcpp::NodeOptions());
 
     /**
      * @brief Default destructor.
@@ -184,12 +215,27 @@ class CameraDriverGv : public CameraAravisNodeBase
     [[nodiscard]] bool set_up_camera_stream_structs();
 
     /**
-     * @brief Initialize settings revolving around the pixel formats, i.e. conversion functions and
-     * bits per pixel, and set parameters on camera accordingly.
+     * @brief Get parameter with 'parameter_name' within the list of image format control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within image format control.
+     * The method will prepend 'ImageFormatControl.' to the parameter prior to the search.
+     * @param[out] param_value Parameter value.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] inline bool get_image_format_control_parameter(
+      const std::string& param_name,
+      rclcpp::ParameterValue& param_value);
+
+    /**
+     * @brief Set image format control settings.
+     *
+     * For example: Pixel Format, Image Size, Image Offset ...
      *
      * @return True if successful. False, otherwise.
      */
-    [[nodiscard]] bool initialize_and_set_pixel_formats();
+    [[nodiscard]] bool set_image_format_control_settings();
 
     /**
      * @brief Set acquisition control settings.
@@ -223,16 +269,26 @@ class CameraDriverGv : public CameraAravisNodeBase
     void process_stream_buffer(const uint stream_id);
 
     /**
+     * @brief Adjust image roi to actual image size stored in the buffer.
+     *
+     * @param[in, out] img_roi Image ROI.
+     * @param[in] p_buffer Pointer to image buffer.
+     * @returns True, if roi needed adjustment. False, otherwise.
+     */
+    bool adjust_image_roi(ImageRoi& img_roi, ArvBuffer* p_buffer) const;
+
+    /**
      * @brief Set metadata to image message.
      *
      * @param[in,out] p_img_msg Pointer to image message.
      * @param[in] p_buffer Pointer to aravis buffer holding the pixel data.
      * @param[in] sensor Sensor object corresponding to image. Used to set frame_id, image_encoding,
      * and more.
+     * @param[in] img_roi Image ROI.
      */
     void fill_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
-                                 ArvBuffer* p_buffer,
-                                 const Sensor& sensor) const;
+                                 ArvBuffer* p_buffer, const Sensor& sensor,
+                                 const ImageRoi& img_roi) const;
 
     /**
      * @brief Fill camera_info message.

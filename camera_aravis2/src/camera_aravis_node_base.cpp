@@ -28,6 +28,9 @@
 
 #include "../include/camera_aravis2/camera_aravis_node_base.h"
 
+// Std
+#include <type_traits>
+
 // camera_aravis2
 #include "../include/camera_aravis2/common.h"
 #include "../include/camera_aravis2/error.h"
@@ -140,6 +143,211 @@ void CameraAravisNodeBase::setup_parameters()
 
     return true;
 }
+
+//==================================================================================================
+template <typename T>
+bool CameraAravisNodeBase::get_feature_value(const std::string& feature_name, T& value) const
+{
+    bool is_successful = true;
+    GuardedGError err;
+
+    //--- assert that p_device is set
+    if (!p_device_)
+        return false;
+
+    //--- check if feature is available
+    if (!arv_device_is_feature_available(p_device_, feature_name.c_str(), err.ref()))
+    {
+        RCLCPP_WARN(logger_, "Feature '%s' is not available. Value will not be set.",
+                    feature_name.c_str());
+        ASSERT_GERROR(err, logger_, is_successful);
+        return false;
+    }
+
+    if constexpr (std::is_same_v<T, bool>)
+    {
+        value = arv_device_get_boolean_feature_value(p_device_, feature_name.c_str(), err.ref());
+    }
+    else if constexpr (std::is_same_v<T, std::string>)
+    {
+        value = arv_device_get_string_feature_value(p_device_, feature_name.c_str(), err.ref());
+    }
+    else if constexpr (std::is_same_v<T, int>)
+    {
+        value = arv_device_get_integer_feature_value(p_device_, feature_name.c_str(), err.ref());
+    }
+    else if constexpr (std::is_same_v<T, float>)
+    {
+        value = static_cast<float>(
+          arv_device_get_float_feature_value(p_device_, feature_name.c_str(), err.ref()));
+    }
+    else if constexpr (std::is_same_v<T, double>)
+    {
+        value = arv_device_get_float_feature_value(p_device_, feature_name.c_str(), err.ref());
+    }
+    else
+    {
+        RCLCPP_WARN(logger_, "Setting feature of type '%s' is currently not supported. "
+                             "Value will not be set.",
+                    typeid(T).name());
+    }
+
+    ASSERT_GERROR(err, logger_, is_successful);
+
+    return is_successful;
+}
+template bool CameraAravisNodeBase::get_feature_value(const std::string&, bool&) const;
+template bool CameraAravisNodeBase::get_feature_value(const std::string&, std::string&) const;
+template bool CameraAravisNodeBase::get_feature_value(const std::string&, int&) const;
+template bool CameraAravisNodeBase::get_feature_value(const std::string&, float&) const;
+template bool CameraAravisNodeBase::get_feature_value(const std::string&, double&) const;
+
+//==================================================================================================
+template <typename T>
+bool CameraAravisNodeBase::set_feature_value(const std::string& feature_name, const T& value) const
+{
+    bool is_successful = true;
+    GuardedGError err;
+
+    //--- assert that p_device is set
+    if (!p_device_)
+        return false;
+
+    //--- check if feature is available
+    if (!arv_device_is_feature_available(p_device_, feature_name.c_str(), err.ref()))
+    {
+        RCLCPP_WARN(logger_, "Feature '%s' is not available. Value will not be set.",
+                    feature_name.c_str());
+        ASSERT_GERROR(err, logger_, is_successful);
+        return false;
+    }
+
+    if constexpr (std::is_same_v<T, bool>)
+    {
+        arv_device_set_boolean_feature_value(p_device_, feature_name.c_str(), value, err.ref());
+    }
+    else if constexpr (std::is_same_v<T, std::string>)
+    {
+        arv_device_set_string_feature_value(p_device_, feature_name.c_str(),
+                                            static_cast<std::string>(value).c_str(), err.ref());
+    }
+    else if constexpr (std::is_same_v<T, int>)
+    {
+        arv_device_set_integer_feature_value(p_device_, feature_name.c_str(), value, err.ref());
+    }
+    else if constexpr (std::is_same_v<T, int64_t>)
+    {
+        arv_device_set_integer_feature_value(p_device_, feature_name.c_str(), value, err.ref());
+    }
+    else if constexpr (std::is_same_v<T, float>)
+    {
+        arv_device_set_float_feature_value(p_device_, feature_name.c_str(),
+                                           static_cast<double>(value), err.ref());
+    }
+    else if constexpr (std::is_same_v<T, double>)
+    {
+        arv_device_set_float_feature_value(p_device_, feature_name.c_str(),
+                                           value, err.ref());
+    }
+    else
+    {
+        RCLCPP_WARN(logger_, "Setting feature of type '%s' is currently not supported. "
+                             "Value will not be set.",
+                    typeid(T).name());
+    }
+
+    ASSERT_GERROR(err, logger_, is_successful);
+
+    return is_successful;
+}
+template bool CameraAravisNodeBase::set_feature_value(const std::string&, const bool&) const;
+template bool CameraAravisNodeBase::set_feature_value(const std::string&, const std::string&) const;
+template bool CameraAravisNodeBase::set_feature_value(const std::string&, const int&) const;
+template bool CameraAravisNodeBase::set_feature_value(const std::string&, const int64_t&) const;
+template bool CameraAravisNodeBase::set_feature_value(const std::string&, const float&) const;
+template bool CameraAravisNodeBase::set_feature_value(const std::string&, const double&) const;
+
+//==================================================================================================
+template <typename T>
+bool CameraAravisNodeBase::set_feature_value_from_parameter(
+  const std::string& feature_name,
+  const rclcpp::ParameterValue& parameter_value,
+  const uint& idx) const
+{
+    T value;
+
+    //--- check if single parameter of parameter array
+    //--- BYTE_ARRAY is the first 'array' type in the list
+    if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+    {
+        value = parameter_value.get<T>();
+    }
+    else
+    {
+        // List of values that are to be set. If the list is smaller than the number of streams
+        // the last value of the is used for the remaining streams.
+        std::vector<T> value_list = parameter_value.get<std::vector<T>>();
+
+        if (value_list.empty())
+            return false;
+
+        value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
+    }
+
+    return set_feature_value<T>(feature_name, value);
+}
+template bool CameraAravisNodeBase::set_feature_value_from_parameter<bool>(
+  const std::string&, const rclcpp::ParameterValue&, const uint&) const;
+template bool CameraAravisNodeBase::set_feature_value_from_parameter<std::string>(
+  const std::string&, const rclcpp::ParameterValue&, const uint&) const;
+template bool CameraAravisNodeBase::set_feature_value_from_parameter<int64_t>(
+  const std::string&, const rclcpp::ParameterValue&, const uint&) const;
+template bool CameraAravisNodeBase::set_feature_value_from_parameter<double>(
+  const std::string&, const rclcpp::ParameterValue&, const uint&) const;
+
+//==================================================================================================
+template <typename T>
+bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter(
+  const std::string& feature_name,
+  const T& min, const T& max,
+  const rclcpp::ParameterValue& parameter_value,
+  const uint& idx) const
+{
+    T bounded_value;
+
+    //--- check if single parameter of parameter array
+    //--- BYTE_ARRAY is the first 'array' type in the list
+    if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+    {
+        bounded_value = std::max(min, std::min(parameter_value.get<T>(), max));
+    }
+    else
+    {
+        // List of values that are to be set. If the list is smaller than the number of streams
+        // the last value of the is used for the remaining streams.
+        std::vector<T> value_list = parameter_value.get<std::vector<T>>();
+
+        if (value_list.empty())
+            return false;
+
+        T unbounded_value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
+        bounded_value     = std::max(min, std::min(unbounded_value, max));
+    }
+
+    return set_feature_value<T>(feature_name, bounded_value);
+}
+template bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter<bool>(
+  const std::string&, const bool&, const bool&,
+  const rclcpp::ParameterValue&, const uint&) const;
+template bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter<std::string>(
+  const std::string&, const std::string&, const std::string&,
+  const rclcpp::ParameterValue&, const uint&) const;
+template bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter<int64_t>(
+  const std::string&, const int64_t&, const int64_t&,
+  const rclcpp::ParameterValue&, const uint&) const;
+template bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter<double>(
+  const std::string&, const double&, const double&,
+  const rclcpp::ParameterValue&, const uint&) const;
 
 //==================================================================================================
 std::string CameraAravisNodeBase::construct_camera_guid_str(ArvCamera* p_cam)

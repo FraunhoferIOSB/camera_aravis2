@@ -47,7 +47,8 @@ class CameraDriverUv : public CameraAravisNodeBase
      *
      * @param[in] options Node options.
      */
-    explicit CameraDriverUv(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
+    explicit CameraDriverUv(const rclcpp::NodeOptions& options =
+                              rclcpp::NodeOptions().allow_undeclared_parameters(true));
 
     /**
      * @brief Default destructor.

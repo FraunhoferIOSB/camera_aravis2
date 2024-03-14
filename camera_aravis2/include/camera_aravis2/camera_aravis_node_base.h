@@ -30,6 +30,7 @@
 #define CAMERA_ARAVIS2__CAMERA_ARAVIS_NODE_BASE_H_
 
 // Std
+#include <map>
 #include <string>
 
 // Aravis
@@ -40,6 +41,9 @@ extern "C"
 
 // ROS
 #include <rclcpp/rclcpp.hpp>
+
+// camera_aravis2
+#include "camera_aravis2/error.h"
 
 namespace camera_aravis2
 {
@@ -82,6 +86,70 @@ class CameraAravisNodeBase : public rclcpp::Node
      */
     [[nodiscard]] bool discover_and_open_camera_device();
 
+    /**
+     * @brief Get feature value if it is available.
+     *
+     * @tparam T Type of feature value.
+     * @param[in] feature_name Name of feature.
+     * @param[out] value Value of feature name. If method returns false, value is unchanged.
+     * @return Returns true if successful, false otherwise.
+     */
+    template <typename T>
+    bool get_feature_value(const std::string& feature_name, T& value) const;
+
+    /**
+     * @brief Set feature value if it is available.
+     *
+     * @tparam T Type of feature value.
+     * @param[in] feature_name Name of feature.
+     * @param[in] value Value to set.
+     * @return Returns true if successful, false otherwise.
+     */
+    template <typename T>
+    bool set_feature_value(const std::string& feature_name, const T& value) const;
+
+    /**
+     * @brief Set feature from parameter value if it is available.
+     *
+     * This will first check if the parameter is an array type. If so, it will use 'idx' to access
+     * the parameter. If the given index outside of the range, the last value of the list is used.
+     *
+     * @tparam T Type of feature value.
+     * @param[in] feature_name Name of feature.
+     * @param[in] parameter_value Specified parameter values.
+     * @param[in] idx Index of parameter value that is to be set. Only used if parameter values are
+     * given as array.
+     * @return Returns true if successful, false otherwise.
+     */
+    template <typename T>
+    bool set_feature_value_from_parameter(const std::string& feature_name,
+                                          const rclcpp::ParameterValue& parameter_value,
+                                          const uint& idx = 0) const;
+
+    /**
+     * @brief Set bounded feature from parameter value if it is available.
+     *
+     * If the parameter is available, this will first check if the parameter is an array type. If
+     * so, it will use 'idx' to access the parameter. If the given index outside of the range, the
+     * last value of the list is used.
+     *
+     * Values outside of the range specified by 'min' and 'max', will be truncated to the range.
+     *
+     * @tparam T Type of feature value.
+     * @param[in] feature_name Name of feature.
+     * @param[in] min Minimum bound.
+     * @param[in] max Maximum bound.
+     * @param[in] parameter_value Specified parameter values.
+     * @param[in] idx Index of parameter value that is to be set. Only used if parameter values are
+     * given as array.
+     * @return Returns true if successful, false otherwise.
+     */
+    template <typename T>
+    bool set_bounded_feature_value_from_parameter(const std::string& feature_name,
+                                                  const T& min, const T& max,
+                                                  const rclcpp::ParameterValue& parameter_value,
+                                                  const uint& idx = 0) const;
+
     //--- FUNCTION DECLARATION ---//
 
   protected:
@@ -118,6 +186,9 @@ class CameraAravisNodeBase : public rclcpp::Node
 
     /// GUID of camera.
     std::string guid_;
+
+    /// List of parameter overrides, including parameters that have not been declared.
+    std::map<std::string, rclcpp::ParameterValue> parameter_overrides_;
 };
 
 }  // namespace camera_aravis2

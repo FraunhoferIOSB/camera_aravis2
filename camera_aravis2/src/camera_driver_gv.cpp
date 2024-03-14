@@ -57,6 +57,9 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     //--- setup parameters
     setup_parameters();
 
+    //--- get parameter overrides, i.e. all parameters, including those that are not declared
+    parameter_overrides_ = this->get_node_parameters_interface()->get_parameter_overrides();
+
     //--- open camera device
     ASSERT_SUCCESS(discover_and_open_camera_device());
 
@@ -71,7 +74,7 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     ASSERT_SUCCESS(set_up_camera_stream_structs());
 
     //--- initialize and set pixel format settings
-    ASSERT_SUCCESS(initialize_and_set_pixel_formats());
+    ASSERT_SUCCESS(set_image_format_control_settings());
 
     //--- set standard camera settings
     ASSERT_SUCCESS(set_acquisition_control_settings());
@@ -143,6 +146,8 @@ void CameraDriverGv::setup_parameters()
     //--- call method of parent class
     CameraAravisNodeBase::setup_parameters();
 
+    //--- stream parameters
+
     auto stream_names_desc = rcl_interfaces::msg::ParameterDescriptor{};
     stream_names_desc.description =
       "Optional string list of names that are to be "
@@ -151,15 +156,6 @@ void CameraDriverGv::setup_parameters()
       "based on its ID, starting with 0.";
     declare_parameter<std::vector<std::string>>("stream_names", std::vector<std::string>({}),
                                                 stream_names_desc);
-
-    auto pixel_formats_desc = rcl_interfaces::msg::ParameterDescriptor{};
-    pixel_formats_desc.description =
-      "String list of pixel formats associated with each "
-      "stream. List must have the same length as 'camera_info_urls'. "
-      "If both lists have different lengths, they are truncated to "
-      "the size of the shorter one.";
-    declare_parameter<std::vector<std::string>>("pixel_formats", std::vector<std::string>({}),
-                                                pixel_formats_desc);
 
     auto camera_info_urls_desc = rcl_interfaces::msg::ParameterDescriptor{};
     camera_info_urls_desc.description =
@@ -178,6 +174,18 @@ void CameraDriverGv::setup_parameters()
       "stream name is appended, together with '_' as separator. If no "
       "frame ID is specified, the name of the node will be used.";
     declare_parameter<std::string>("frame_id", "", frame_id_desc);
+
+    //--- image format parameters
+
+    auto pixel_formats_desc = rcl_interfaces::msg::ParameterDescriptor{};
+    pixel_formats_desc.description =
+      "String list of pixel formats associated with each "
+      "stream. List must have the same length as 'camera_info_urls'. "
+      "If both lists have different lengths, they are truncated to "
+      "the size of the shorter one.";
+    declare_parameter<std::vector<std::string>>("pixel_formats", std::vector<std::string>({}),
+                                                pixel_formats_desc);
+    //--- acquisition parameters
 
     auto acquisition_mode_desc = rcl_interfaces::msg::ParameterDescriptor{};
     acquisition_mode_desc.description =
@@ -353,48 +361,142 @@ bool CameraDriverGv::set_up_camera_stream_structs()
 }
 
 //==================================================================================================
-[[nodiscard]] bool CameraDriverGv::initialize_and_set_pixel_formats()
+[[nodiscard]] inline bool CameraDriverGv::get_image_format_control_parameter(
+  const std::string& param_name,
+  rclcpp::ParameterValue& param_value)
 {
-    // Guarded error object
+    std::string key = std::string("ImageFormatControl.").append(param_name);
+    if (parameter_overrides_.find(key) != parameter_overrides_.end())
+    {
+        param_value = parameter_overrides_[key];
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::set_image_format_control_settings()
+{
     GuardedGError err;
 
     for (uint i = 0; i < streams_.size(); ++i)
     {
-        bool isSuccessful = true;
+        // NOTE: Not all parameters are essential, which is why only the success of some parameters
+        // are checked.
+        bool is_successful = true;
 
-        Stream& stream = streams_[i];
-        Sensor& sensor = stream.sensor;
+        Stream& stream      = streams_[i];
+        Sensor& sensor      = stream.sensor;
+        ImageRoi& image_roi = stream.image_roi;
+
+        std::string tmp_feature_name;
+        rclcpp::ParameterValue tmp_param_value;
+        gint64 tmp_min, tmp_max;
 
         //--- set source, if applicable
         if (streams_.size() > 1)
         {
             // TODO(boitumeloruf): make more source selector more generic
             std::string src_selector_val = "Source" + std::to_string(i);
-            arv_device_set_string_feature_value(p_device_,
-                                                "SourceSelector", src_selector_val.c_str(),
-                                                err.ref());
-            ASSERT_GERROR(err, logger_, isSuccessful);
+            is_successful &=
+              set_feature_value<std::string>("SourceSelector", src_selector_val);
         }
 
         //--- set desired pixel format and get actual value that has been set
-        arv_camera_set_pixel_format_from_string(p_camera_, sensor.pixel_format.c_str(),
-                                                err.ref());
-        sensor.pixel_format = arv_camera_get_pixel_format_as_string(p_camera_, err.ref());
-        ASSERT_GERROR(err, logger_, isSuccessful);
+        is_successful &= set_feature_value<std::string>("PixelFormat", sensor.pixel_format);
+        is_successful &= get_feature_value<std::string>("PixelFormat", sensor.pixel_format);
 
         //--- get conversion function and number of bits per pixel corresponding to pixel format
-        const auto sensor_iter = CONVERSIONS_DICTIONARY.find(sensor.pixel_format);
-        if (sensor_iter != CONVERSIONS_DICTIONARY.end())
-            stream.cvt_pixel_format = sensor_iter->second;
+        const auto itr = CONVERSIONS_DICTIONARY.find(sensor.pixel_format);
+        if (itr != CONVERSIONS_DICTIONARY.end())
+            stream.cvt_pixel_format = itr->second;
         else
             RCLCPP_WARN(logger_, "There is no known conversion from %s to a usual ROS image "
                                  "encoding. Likely you need to implement one.",
                         sensor.pixel_format.c_str());
+
+        //--- get bits per pixel
         sensor.n_bits_pixel =
           ARV_PIXEL_FORMAT_BIT_PER_PIXEL(arv_camera_get_pixel_format(p_camera_, err.ref()));
-        ASSERT_GERROR(err, logger_, isSuccessful);
+        ASSERT_GERROR(err, logger_, is_successful);
 
-        if (!isSuccessful)
+        //--- get sensor size
+        get_feature_value<int>("SensorWidth", sensor.width);
+        get_feature_value<int>("SensorHeight", sensor.height);
+
+        //--- horizontal and vertical flip
+        tmp_feature_name = "ReverseX";
+        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
+            set_feature_value_from_parameter<bool>(tmp_feature_name, tmp_param_value, i);
+        get_feature_value<bool>(tmp_feature_name, sensor.reverse_x);
+
+        tmp_feature_name = "ReverseY";
+        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
+            set_feature_value_from_parameter<bool>(tmp_feature_name, tmp_param_value, i);
+        get_feature_value<bool>(tmp_feature_name, sensor.reverse_y);
+
+        //--- image roi width
+        tmp_feature_name = "Width";
+        tmp_min          = 0;
+        tmp_max          = sensor.width;
+        arv_device_get_integer_feature_bounds(p_device_, tmp_feature_name.c_str(),
+                                              &tmp_min, &tmp_max, err.ref());
+        image_roi.width_min = tmp_min,
+        image_roi.width_max = tmp_max;
+        CHECK_GERROR(err, logger_);
+
+        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
+            set_bounded_feature_value_from_parameter<int64_t>(
+              tmp_feature_name, tmp_min, tmp_max, tmp_param_value, i);
+        else
+            //--- if width not specified, use max width
+            set_feature_value<int>(tmp_feature_name, image_roi.width_max);
+        get_feature_value<int>(tmp_feature_name, image_roi.width);
+
+        //--- image roi height
+        tmp_feature_name = "Height";
+        tmp_min          = 0;
+        tmp_max          = sensor.height;
+        arv_device_get_integer_feature_bounds(p_device_, tmp_feature_name.c_str(),
+                                              &tmp_min, &tmp_max, err.ref());
+        image_roi.height_min = tmp_min,
+        image_roi.height_max = tmp_max;
+        CHECK_GERROR(err, logger_);
+
+        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
+            set_bounded_feature_value_from_parameter<int64_t>(
+              tmp_feature_name, tmp_min, tmp_max, tmp_param_value, i);
+        else
+            //--- if height not specified, use max height
+            set_feature_value<int>(tmp_feature_name, image_roi.height_max);
+        get_feature_value<int>(tmp_feature_name, image_roi.height);
+
+        //--- image roi offset x
+        tmp_feature_name = "OffsetX";
+        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
+            set_feature_value_from_parameter<int64_t>(
+              tmp_feature_name, tmp_param_value, i);
+        else
+            //--- if width not specified, use origin
+            set_feature_value<int>(tmp_feature_name, 0);
+        get_feature_value<int>(tmp_feature_name, image_roi.x);
+
+        //--- image roi height
+        tmp_feature_name = "OffsetY";
+        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
+            set_feature_value_from_parameter<int64_t>(
+              tmp_feature_name, tmp_param_value, i);
+        else
+            //--- if width not specified, use origin
+            set_feature_value<int>(tmp_feature_name, 0);
+        get_feature_value<int>(tmp_feature_name, image_roi.y);
+
+        // NOTE: Not all parameters are essential, which is why only the success of some parameters
+        // are checked.
+        if (!is_successful)
             return false;
     }
 
@@ -637,8 +739,19 @@ void CameraDriverGv::process_stream_buffer(const uint stream_id)
         if (!p_arv_buffer || !p_img_msg)
             continue;
 
+        //--- check that image roi corresponds to actual image in buffer
+        if (adjust_image_roi(stream.image_roi, p_arv_buffer))
+        {
+            RCLCPP_WARN(logger_,
+                        "Image region specified for stream %i (%s) doesn't match received. "
+                        "Setting region to: x=%i y=%i width= %i height=%i.",
+                        stream_id, stream.name.c_str(),
+                        stream.image_roi.x, stream.image_roi.x,
+                        stream.image_roi.width, stream.image_roi.height);
+        }
+
         //--- set meta data of image message
-        fill_image_msg_metadata(p_img_msg, p_arv_buffer, stream.sensor);
+        fill_image_msg_metadata(p_img_msg, p_arv_buffer, stream.sensor, stream.image_roi);
 
         //--- convert to ros format
         if (stream.cvt_pixel_format)
@@ -661,9 +774,28 @@ void CameraDriverGv::process_stream_buffer(const uint stream_id)
 }
 
 //==================================================================================================
+bool CameraDriverGv::adjust_image_roi(ImageRoi& img_roi, ArvBuffer* p_buffer) const
+{
+    gint x, y, width, height;
+
+    arv_buffer_get_image_region(p_buffer, &x, &y, &width, &height);
+
+    if (x == img_roi.x && y == img_roi.y && width == img_roi.width && height == img_roi.height)
+        return false;
+
+    img_roi.x      = x;
+    img_roi.y      = y;
+    img_roi.width  = width;
+    img_roi.height = height;
+
+    return true;
+}
+
+//==================================================================================================
 void CameraDriverGv::fill_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
                                              ArvBuffer* p_buffer,
-                                             const Sensor& sensor) const
+                                             const Sensor& sensor,
+                                             const ImageRoi& img_roi) const
 {
     //--- fill header data
 
@@ -673,14 +805,10 @@ void CameraDriverGv::fill_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr&
     p_img_msg->header.frame_id = sensor.frame_id;
 
     //--- fill image meta data
-
-    // TODO: Support ROI
-    gint x, y, width, height;
-    arv_buffer_get_image_region(p_buffer, &x, &y, &width, &height);
-    p_img_msg->width    = width;
-    p_img_msg->height   = height;
+    p_img_msg->width    = img_roi.width;
+    p_img_msg->height   = img_roi.height;
     p_img_msg->encoding = sensor.pixel_format;
-    p_img_msg->step     = (width * sensor.n_bits_pixel) / 8;
+    p_img_msg->step     = (img_roi.width * sensor.n_bits_pixel) / 8;
 }
 
 //==================================================================================================
