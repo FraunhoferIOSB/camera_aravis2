@@ -71,20 +71,20 @@ class CameraAravisNodeBase : public rclcpp::Node
     /**
      * @brief Returns true, if node is is initialized. False, otherwise.
      */
-    bool is_initialized() const;
+    bool isInitialized() const;
 
   protected:
     /**
      * @brief Set the up launch parameters.
      */
-    virtual void setup_parameters();
+    virtual void setUpParameters();
 
     /**
      * @brief Discover attached camera devices found by Aravis and open device specified by guid.
      *
      * @return True if successful. False, otherwise.
      */
-    [[nodiscard]] bool discover_and_open_camera_device();
+    [[nodiscard]] bool discoverAndOpenCameraDevice();
 
     /**
      * @brief Get feature value if it is available.
@@ -95,7 +95,7 @@ class CameraAravisNodeBase : public rclcpp::Node
      * @return Returns true if successful, false otherwise.
      */
     template <typename T>
-    bool get_feature_value(const std::string& feature_name, T& value) const;
+    bool getFeatureValue(const std::string& feature_name, T& value) const;
 
     /**
      * @brief Set feature value if it is available.
@@ -106,7 +106,7 @@ class CameraAravisNodeBase : public rclcpp::Node
      * @return Returns true if successful, false otherwise.
      */
     template <typename T>
-    bool set_feature_value(const std::string& feature_name, const T& value) const;
+    bool setFeatureValue(const std::string& feature_name, const T& value) const;
 
     /**
      * @brief Set feature from parameter value if it is available.
@@ -122,9 +122,9 @@ class CameraAravisNodeBase : public rclcpp::Node
      * @return Returns true if successful, false otherwise.
      */
     template <typename T>
-    bool set_feature_value_from_parameter(const std::string& feature_name,
-                                          const rclcpp::ParameterValue& parameter_value,
-                                          const uint& idx = 0) const;
+    bool setFeatureValueFromParameter(const std::string& feature_name,
+                                      const rclcpp::ParameterValue& parameter_value,
+                                      const uint& idx = 0) const;
 
     /**
      * @brief Set bounded feature from parameter value if it is available.
@@ -145,10 +145,10 @@ class CameraAravisNodeBase : public rclcpp::Node
      * @return Returns true if successful, false otherwise.
      */
     template <typename T>
-    bool set_bounded_feature_value_from_parameter(const std::string& feature_name,
-                                                  const T& min, const T& max,
-                                                  const rclcpp::ParameterValue& parameter_value,
-                                                  const uint& idx = 0) const;
+    bool setBoundedFeatureValueFromParameter(const std::string& feature_name,
+                                             const T& min, const T& max,
+                                             const rclcpp::ParameterValue& parameter_value,
+                                             const uint& idx = 0) const;
 
     //--- FUNCTION DECLARATION ---//
 
@@ -159,7 +159,7 @@ class CameraAravisNodeBase : public rclcpp::Node
      *
      * @return GUID in the format: <vendor_name>-<model_name>-<device_sn | device_id>.
      */
-    static std::string construct_camera_guid_str(ArvCamera* p_cam);
+    static std::string constructCameraGuidStr(ArvCamera* p_cam);
 
     /**
      * @brief Handle 'control-lost' signal emitted by aravis.
@@ -167,7 +167,7 @@ class CameraAravisNodeBase : public rclcpp::Node
      * @param[in] p_device Pointer to aravis device.
      * @param[in] p_user_data Pointer to associated user data.
      */
-    static void handle_control_lost_signal(ArvDevice* p_device, gpointer p_user_data);
+    static void handleControlLostSignal(ArvDevice* p_device, gpointer p_user_data);
 
     //--- MEMBER DECLARATION ---//
 

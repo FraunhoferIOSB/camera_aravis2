@@ -196,13 +196,13 @@ class CameraDriverGv : public CameraAravisNodeBase
     /**
      * @brief Returns true, if node is spawning or is initialized. False, otherwise.
      */
-    bool is_spawning_or_initialized() const;
+    bool isSpawningOrInitialized() const;
 
   protected:
     /**
-     * @brief Set the up launch parameters.
+     * @brief Set up the launch parameters.
      */
-    void setup_parameters() override;
+    void setUpParameters() override;
 
     /**
      * @brief Set up camera stream structs. Here, the number of streams available are discovered,
@@ -212,7 +212,7 @@ class CameraDriverGv : public CameraAravisNodeBase
      *
      * @return True if successful. False, otherwise.
      */
-    [[nodiscard]] bool set_up_camera_stream_structs();
+    [[nodiscard]] bool setUpCameraStreamStructs();
 
     /**
      * @brief Get parameter with 'parameter_name' within the list of image format control
@@ -224,49 +224,49 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
      * False otherwise.
      */
-    [[nodiscard]] inline bool get_image_format_control_parameter(
+    [[nodiscard]] inline bool getImageFormatControlParameter(
       const std::string& param_name,
       rclcpp::ParameterValue& param_value);
 
     /**
-     * @brief Set image format control settings.
+     * @brief Set image format control settings of the camera.
      *
      * For example: Pixel Format, Image Size, Image Offset ...
      *
      * @return True if successful. False, otherwise.
      */
-    [[nodiscard]] bool set_image_format_control_settings();
+    [[nodiscard]] bool setImageFormatControlSettings();
 
     /**
-     * @brief Set acquisition control settings.
+     * @brief Set acquisition control settings of the camera.
      *
      * @return True if successful. False, otherwise.
      */
-    [[nodiscard]] bool set_acquisition_control_settings();
+    [[nodiscard]] bool setAcquisitionControlSettings();
 
     /**
      * @brief Discover number of available camera streams.
      */
-    int discover_stream_number();
+    int discoverNumberOfStreams();
 
     /**
      * @brief Spawn camera streams.
      */
-    void spawn_camera_streams();
+    void spawnCameraStreams();
 
     /**
      * @brief Tune specific parameters for GigEVision streams.
      *
      * @param[in] p_stream Pointer to Aravis Gv stream.
      */
-    void tune_gv_stream(ArvGvStream* p_stream) const;
+    void tuneGvStream(ArvGvStream* p_stream) const;
 
     /**
      * @brief Process available stream buffer.
      *
      * @param[in] stream_id ID of stream for which the buffer is to be processed.
      */
-    void process_stream_buffer(const uint stream_id);
+    void processStreamBuffer(const uint stream_id);
 
     /**
      * @brief Adjust image roi to actual image size stored in the buffer.
@@ -275,7 +275,7 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @param[in] p_buffer Pointer to image buffer.
      * @returns True, if roi needed adjustment. False, otherwise.
      */
-    bool adjust_image_roi(ImageRoi& img_roi, ArvBuffer* p_buffer) const;
+    bool adjustImageRoi(ImageRoi& img_roi, ArvBuffer* p_buffer) const;
 
     /**
      * @brief Set metadata to image message.
@@ -286,9 +286,9 @@ class CameraDriverGv : public CameraAravisNodeBase
      * and more.
      * @param[in] img_roi Image ROI.
      */
-    void fill_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
-                                 ArvBuffer* p_buffer, const Sensor& sensor,
-                                 const ImageRoi& img_roi) const;
+    void fillImageMsgMetadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
+                              ArvBuffer* p_buffer, const Sensor& sensor,
+                              const ImageRoi& img_roi) const;
 
     /**
      * @brief Fill camera_info message.
@@ -296,13 +296,13 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @param[in,out] stream Stream object which holds camera_info message and other data.
      * @param[in] p_img_msg Pointer to corresponding image message.
      */
-    void fill_camera_info_msg(Stream& stream,
-                              const sensor_msgs::msg::Image::SharedPtr& p_img_msg) const;
+    void fillCameraInfoMsg(Stream& stream,
+                           const sensor_msgs::msg::Image::SharedPtr& p_img_msg) const;
 
     /**
      * @brief Print stream statistics, such as completed and failed buffers.
      */
-    void print_stream_statistics() const;
+    void printStreamStatistics() const;
 
     //--- FUNCTION DECLARATION ---//
 
@@ -313,7 +313,7 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @param[in] p_device Pointer to aravis device.
      * @param[in] p_user_data Pointer to associated user data.
      */
-    static void handle_new_buffer_signal(ArvStream* p_stream, gpointer p_user_data);
+    static void handleNewBufferSignal(ArvStream* p_stream, gpointer p_user_data);
 
     //--- MEMBER DECLARATION ---//
 

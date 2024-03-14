@@ -47,12 +47,12 @@ CameraXmlExporter::CameraXmlExporter(const rclcpp::NodeOptions& options) :
   xml_file_path_("")
 {
     //--- setup parameters
-    setup_parameters();
+    setUpParameters();
 
     //--- open camera device
-    ASSERT_SUCCESS(discover_and_open_camera_device());
+    ASSERT_SUCCESS(discoverAndOpenCameraDevice());
 
-    std::string camera_guid_str = CameraAravisNodeBase::construct_camera_guid_str(p_camera_);
+    std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
     RCLCPP_INFO(logger_, "Successfully Opened: %s", camera_guid_str.c_str());
 
     //--- export XML data to file
@@ -68,10 +68,10 @@ CameraXmlExporter::~CameraXmlExporter()
 }
 
 //==================================================================================================
-void CameraXmlExporter::setup_parameters()
+void CameraXmlExporter::setUpParameters()
 {
     //--- call method of parent class
-    CameraAravisNodeBase::setup_parameters();
+    CameraAravisNodeBase::setUpParameters();
 
     auto xmlFile_desc = rcl_interfaces::msg::ParameterDescriptor{};
     xmlFile_desc.description =
@@ -89,7 +89,7 @@ void CameraXmlExporter::setup_parameters()
     if (xml_file_str.empty())
     {
         std::string tmpFileName = (guid_.empty())
-                                    ? construct_camera_guid_str(p_camera_)
+                                    ? constructCameraGuidStr(p_camera_)
                                     : guid_;
 
         // replace whitespaces in url (coming from GUID) with '_'

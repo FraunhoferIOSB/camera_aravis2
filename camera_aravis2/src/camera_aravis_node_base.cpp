@@ -61,13 +61,13 @@ CameraAravisNodeBase::~CameraAravisNodeBase()
 }
 
 //==================================================================================================
-bool CameraAravisNodeBase::is_initialized() const
+bool CameraAravisNodeBase::isInitialized() const
 {
     return (is_initialized_);
 }
 
 //==================================================================================================
-void CameraAravisNodeBase::setup_parameters()
+void CameraAravisNodeBase::setUpParameters()
 {
     auto guid_desc = rcl_interfaces::msg::ParameterDescriptor{};
     guid_desc.description =
@@ -76,7 +76,7 @@ void CameraAravisNodeBase::setup_parameters()
 }
 
 //==================================================================================================
-[[nodiscard]] bool CameraAravisNodeBase::discover_and_open_camera_device()
+[[nodiscard]] bool CameraAravisNodeBase::discoverAndOpenCameraDevice()
 {
     // Guarded error object
     GuardedGError err;
@@ -139,14 +139,14 @@ void CameraAravisNodeBase::setup_parameters()
 
     //--- connect control-lost signal
     g_signal_connect(p_device_, "control-lost",
-                     (GCallback)CameraAravisNodeBase::handle_control_lost_signal, this);
+                     (GCallback)CameraAravisNodeBase::handleControlLostSignal, this);
 
     return true;
 }
 
 //==================================================================================================
 template <typename T>
-bool CameraAravisNodeBase::get_feature_value(const std::string& feature_name, T& value) const
+bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& value) const
 {
     bool is_successful = true;
     GuardedGError err;
@@ -196,15 +196,15 @@ bool CameraAravisNodeBase::get_feature_value(const std::string& feature_name, T&
 
     return is_successful;
 }
-template bool CameraAravisNodeBase::get_feature_value(const std::string&, bool&) const;
-template bool CameraAravisNodeBase::get_feature_value(const std::string&, std::string&) const;
-template bool CameraAravisNodeBase::get_feature_value(const std::string&, int&) const;
-template bool CameraAravisNodeBase::get_feature_value(const std::string&, float&) const;
-template bool CameraAravisNodeBase::get_feature_value(const std::string&, double&) const;
+template bool CameraAravisNodeBase::getFeatureValue(const std::string&, bool&) const;
+template bool CameraAravisNodeBase::getFeatureValue(const std::string&, std::string&) const;
+template bool CameraAravisNodeBase::getFeatureValue(const std::string&, int&) const;
+template bool CameraAravisNodeBase::getFeatureValue(const std::string&, float&) const;
+template bool CameraAravisNodeBase::getFeatureValue(const std::string&, double&) const;
 
 //==================================================================================================
 template <typename T>
-bool CameraAravisNodeBase::set_feature_value(const std::string& feature_name, const T& value) const
+bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, const T& value) const
 {
     bool is_successful = true;
     GuardedGError err;
@@ -260,16 +260,16 @@ bool CameraAravisNodeBase::set_feature_value(const std::string& feature_name, co
 
     return is_successful;
 }
-template bool CameraAravisNodeBase::set_feature_value(const std::string&, const bool&) const;
-template bool CameraAravisNodeBase::set_feature_value(const std::string&, const std::string&) const;
-template bool CameraAravisNodeBase::set_feature_value(const std::string&, const int&) const;
-template bool CameraAravisNodeBase::set_feature_value(const std::string&, const int64_t&) const;
-template bool CameraAravisNodeBase::set_feature_value(const std::string&, const float&) const;
-template bool CameraAravisNodeBase::set_feature_value(const std::string&, const double&) const;
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const bool&) const;
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const std::string&) const;
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const int&) const;
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const int64_t&) const;
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const float&) const;
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const double&) const;
 
 //==================================================================================================
 template <typename T>
-bool CameraAravisNodeBase::set_feature_value_from_parameter(
+bool CameraAravisNodeBase::setFeatureValueFromParameter(
   const std::string& feature_name,
   const rclcpp::ParameterValue& parameter_value,
   const uint& idx) const
@@ -294,20 +294,20 @@ bool CameraAravisNodeBase::set_feature_value_from_parameter(
         value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
     }
 
-    return set_feature_value<T>(feature_name, value);
+    return setFeatureValue<T>(feature_name, value);
 }
-template bool CameraAravisNodeBase::set_feature_value_from_parameter<bool>(
+template bool CameraAravisNodeBase::setFeatureValueFromParameter<bool>(
   const std::string&, const rclcpp::ParameterValue&, const uint&) const;
-template bool CameraAravisNodeBase::set_feature_value_from_parameter<std::string>(
+template bool CameraAravisNodeBase::setFeatureValueFromParameter<std::string>(
   const std::string&, const rclcpp::ParameterValue&, const uint&) const;
-template bool CameraAravisNodeBase::set_feature_value_from_parameter<int64_t>(
+template bool CameraAravisNodeBase::setFeatureValueFromParameter<int64_t>(
   const std::string&, const rclcpp::ParameterValue&, const uint&) const;
-template bool CameraAravisNodeBase::set_feature_value_from_parameter<double>(
+template bool CameraAravisNodeBase::setFeatureValueFromParameter<double>(
   const std::string&, const rclcpp::ParameterValue&, const uint&) const;
 
 //==================================================================================================
 template <typename T>
-bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter(
+bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
   const std::string& feature_name,
   const T& min, const T& max,
   const rclcpp::ParameterValue& parameter_value,
@@ -334,23 +334,23 @@ bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter(
         bounded_value     = std::max(min, std::min(unbounded_value, max));
     }
 
-    return set_feature_value<T>(feature_name, bounded_value);
+    return setFeatureValue<T>(feature_name, bounded_value);
 }
-template bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter<bool>(
+template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<bool>(
   const std::string&, const bool&, const bool&,
   const rclcpp::ParameterValue&, const uint&) const;
-template bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter<std::string>(
+template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<std::string>(
   const std::string&, const std::string&, const std::string&,
   const rclcpp::ParameterValue&, const uint&) const;
-template bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter<int64_t>(
+template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<int64_t>(
   const std::string&, const int64_t&, const int64_t&,
   const rclcpp::ParameterValue&, const uint&) const;
-template bool CameraAravisNodeBase::set_bounded_feature_value_from_parameter<double>(
+template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<double>(
   const std::string&, const double&, const double&,
   const rclcpp::ParameterValue&, const uint&) const;
 
 //==================================================================================================
-std::string CameraAravisNodeBase::construct_camera_guid_str(ArvCamera* p_cam)
+std::string CameraAravisNodeBase::constructCameraGuidStr(ArvCamera* p_cam)
 {
     const char* vendor_name = arv_camera_get_vendor_name(p_cam, nullptr);
     const char* model_name  = arv_camera_get_model_name(p_cam, nullptr);
@@ -363,7 +363,7 @@ std::string CameraAravisNodeBase::construct_camera_guid_str(ArvCamera* p_cam)
 }
 
 //==================================================================================================
-void CameraAravisNodeBase::handle_control_lost_signal(ArvDevice* p_device, gpointer p_user_data)
+void CameraAravisNodeBase::handleControlLostSignal(ArvDevice* p_device, gpointer p_user_data)
 {
     RCL_UNUSED(p_device);
 

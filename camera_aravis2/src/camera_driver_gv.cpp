@@ -55,13 +55,13 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
   use_ptp_timestamp_(false)
 {
     //--- setup parameters
-    setup_parameters();
+    setUpParameters();
 
     //--- get parameter overrides, i.e. all parameters, including those that are not declared
     parameter_overrides_ = this->get_node_parameters_interface()->get_parameter_overrides();
 
     //--- open camera device
-    ASSERT_SUCCESS(discover_and_open_camera_device());
+    ASSERT_SUCCESS(discoverAndOpenCameraDevice());
 
     //--- check if GEV Device.
     if (!arv_camera_is_gv_device(p_camera_))
@@ -71,17 +71,17 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     }
 
     //--- set up structs holding relevant information of camera streams
-    ASSERT_SUCCESS(set_up_camera_stream_structs());
+    ASSERT_SUCCESS(setUpCameraStreamStructs());
 
     //--- initialize and set pixel format settings
-    ASSERT_SUCCESS(set_image_format_control_settings());
+    ASSERT_SUCCESS(setImageFormatControlSettings());
 
     //--- set standard camera settings
-    ASSERT_SUCCESS(set_acquisition_control_settings());
+    ASSERT_SUCCESS(setAcquisitionControlSettings());
 
     //--- spawn camera stream in thread, so that initialization is not blocked
     is_spawning_         = true;
-    spawn_stream_thread_ = std::thread(&CameraDriverGv::spawn_camera_streams, this);
+    spawn_stream_thread_ = std::thread(&CameraDriverGv::spawnCameraStreams, this);
 }
 
 //==================================================================================================
@@ -122,7 +122,7 @@ CameraDriverGv::~CameraDriverGv()
     }
 
     //--- print stream statistics
-    print_stream_statistics();
+    printStreamStatistics();
 
     //--- unref pointers
     for (uint i = 0; i < streams_.size(); i++)
@@ -135,16 +135,16 @@ CameraDriverGv::~CameraDriverGv()
 }
 
 //==================================================================================================
-bool CameraDriverGv::is_spawning_or_initialized() const
+bool CameraDriverGv::isSpawningOrInitialized() const
 {
     return (is_spawning_ || is_initialized_);
 }
 
 //==================================================================================================
-void CameraDriverGv::setup_parameters()
+void CameraDriverGv::setUpParameters()
 {
     //--- call method of parent class
-    CameraAravisNodeBase::setup_parameters();
+    CameraAravisNodeBase::setUpParameters();
 
     //--- stream parameters
 
@@ -215,11 +215,11 @@ void CameraDriverGv::setup_parameters()
 }
 
 //==================================================================================================
-bool CameraDriverGv::set_up_camera_stream_structs()
+bool CameraDriverGv::setUpCameraStreamStructs()
 {
     //--- get number of streams and associated names
 
-    int num_streams       = discover_stream_number();
+    int num_streams       = discoverNumberOfStreams();
     auto stream_names     = get_parameter("stream_names").as_string_array();
     auto pixel_formats    = get_parameter("pixel_formats").as_string_array();
     auto camera_info_urls = get_parameter("camera_info_urls").as_string_array();
@@ -293,7 +293,7 @@ bool CameraDriverGv::set_up_camera_stream_structs()
     }
 
     //--- set up structs
-    const std::string GUID_STR = CameraAravisNodeBase::construct_camera_guid_str(p_camera_);
+    const std::string GUID_STR = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
     streams_                   = std::vector<Stream>(num_streams);
     for (uint i = 0; i < streams_.size(); ++i)
     {
@@ -361,7 +361,7 @@ bool CameraDriverGv::set_up_camera_stream_structs()
 }
 
 //==================================================================================================
-[[nodiscard]] inline bool CameraDriverGv::get_image_format_control_parameter(
+[[nodiscard]] inline bool CameraDriverGv::getImageFormatControlParameter(
   const std::string& param_name,
   rclcpp::ParameterValue& param_value)
 {
@@ -378,7 +378,7 @@ bool CameraDriverGv::set_up_camera_stream_structs()
 }
 
 //==================================================================================================
-[[nodiscard]] bool CameraDriverGv::set_image_format_control_settings()
+[[nodiscard]] bool CameraDriverGv::setImageFormatControlSettings()
 {
     GuardedGError err;
 
@@ -402,12 +402,12 @@ bool CameraDriverGv::set_up_camera_stream_structs()
             // TODO(boitumeloruf): make more source selector more generic
             std::string src_selector_val = "Source" + std::to_string(i);
             is_successful &=
-              set_feature_value<std::string>("SourceSelector", src_selector_val);
+              setFeatureValue<std::string>("SourceSelector", src_selector_val);
         }
 
         //--- set desired pixel format and get actual value that has been set
-        is_successful &= set_feature_value<std::string>("PixelFormat", sensor.pixel_format);
-        is_successful &= get_feature_value<std::string>("PixelFormat", sensor.pixel_format);
+        is_successful &= setFeatureValue<std::string>("PixelFormat", sensor.pixel_format);
+        is_successful &= getFeatureValue<std::string>("PixelFormat", sensor.pixel_format);
 
         //--- get conversion function and number of bits per pixel corresponding to pixel format
         const auto itr = CONVERSIONS_DICTIONARY.find(sensor.pixel_format);
@@ -424,19 +424,19 @@ bool CameraDriverGv::set_up_camera_stream_structs()
         ASSERT_GERROR(err, logger_, is_successful);
 
         //--- get sensor size
-        get_feature_value<int>("SensorWidth", sensor.width);
-        get_feature_value<int>("SensorHeight", sensor.height);
+        getFeatureValue<int>("SensorWidth", sensor.width);
+        getFeatureValue<int>("SensorHeight", sensor.height);
 
         //--- horizontal and vertical flip
         tmp_feature_name = "ReverseX";
-        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
-            set_feature_value_from_parameter<bool>(tmp_feature_name, tmp_param_value, i);
-        get_feature_value<bool>(tmp_feature_name, sensor.reverse_x);
+        if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<bool>(tmp_feature_name, sensor.reverse_x);
 
         tmp_feature_name = "ReverseY";
-        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
-            set_feature_value_from_parameter<bool>(tmp_feature_name, tmp_param_value, i);
-        get_feature_value<bool>(tmp_feature_name, sensor.reverse_y);
+        if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<bool>(tmp_feature_name, sensor.reverse_y);
 
         //--- image roi width
         tmp_feature_name = "Width";
@@ -448,13 +448,13 @@ bool CameraDriverGv::set_up_camera_stream_structs()
         image_roi.width_max = tmp_max;
         CHECK_GERROR(err, logger_);
 
-        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
-            set_bounded_feature_value_from_parameter<int64_t>(
+        if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
+            setBoundedFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_min, tmp_max, tmp_param_value, i);
         else
             //--- if width not specified, use max width
-            set_feature_value<int>(tmp_feature_name, image_roi.width_max);
-        get_feature_value<int>(tmp_feature_name, image_roi.width);
+            setFeatureValue<int>(tmp_feature_name, image_roi.width_max);
+        getFeatureValue<int>(tmp_feature_name, image_roi.width);
 
         //--- image roi height
         tmp_feature_name = "Height";
@@ -466,33 +466,33 @@ bool CameraDriverGv::set_up_camera_stream_structs()
         image_roi.height_max = tmp_max;
         CHECK_GERROR(err, logger_);
 
-        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
-            set_bounded_feature_value_from_parameter<int64_t>(
+        if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
+            setBoundedFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_min, tmp_max, tmp_param_value, i);
         else
             //--- if height not specified, use max height
-            set_feature_value<int>(tmp_feature_name, image_roi.height_max);
-        get_feature_value<int>(tmp_feature_name, image_roi.height);
+            setFeatureValue<int>(tmp_feature_name, image_roi.height_max);
+        getFeatureValue<int>(tmp_feature_name, image_roi.height);
 
         //--- image roi offset x
         tmp_feature_name = "OffsetX";
-        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
-            set_feature_value_from_parameter<int64_t>(
+        if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_param_value, i);
         else
             //--- if width not specified, use origin
-            set_feature_value<int>(tmp_feature_name, 0);
-        get_feature_value<int>(tmp_feature_name, image_roi.x);
+            setFeatureValue<int>(tmp_feature_name, 0);
+        getFeatureValue<int>(tmp_feature_name, image_roi.x);
 
         //--- image roi height
         tmp_feature_name = "OffsetY";
-        if (get_image_format_control_parameter(tmp_feature_name, tmp_param_value))
-            set_feature_value_from_parameter<int64_t>(
+        if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_param_value, i);
         else
             //--- if width not specified, use origin
-            set_feature_value<int>(tmp_feature_name, 0);
-        get_feature_value<int>(tmp_feature_name, image_roi.y);
+            setFeatureValue<int>(tmp_feature_name, 0);
+        getFeatureValue<int>(tmp_feature_name, image_roi.y);
 
         // NOTE: Not all parameters are essential, which is why only the success of some parameters
         // are checked.
@@ -504,7 +504,7 @@ bool CameraDriverGv::set_up_camera_stream_structs()
 }
 
 //==================================================================================================
-[[nodiscard]] bool CameraDriverGv::set_acquisition_control_settings()
+[[nodiscard]] bool CameraDriverGv::setAcquisitionControlSettings()
 {
     GuardedGError err;
     bool is_successful = true;
@@ -548,7 +548,7 @@ bool CameraDriverGv::set_up_camera_stream_structs()
 }
 
 //==================================================================================================
-int CameraDriverGv::discover_stream_number()
+int CameraDriverGv::discoverNumberOfStreams()
 {
     int num_streams = 0;
 
@@ -580,7 +580,7 @@ int CameraDriverGv::discover_stream_number()
 }
 
 //==================================================================================================
-void CameraDriverGv::spawn_camera_streams()
+void CameraDriverGv::spawnCameraStreams()
 {
     GuardedGError err;
 
@@ -617,9 +617,9 @@ void CameraDriverGv::spawn_camera_streams()
 
                 stream.is_buffer_processed = true;
                 stream.buffer_processing_thread =
-                  std::thread(&CameraDriverGv::process_stream_buffer, this, i);
+                  std::thread(&CameraDriverGv::processStreamBuffer, this, i);
 
-                tune_gv_stream(reinterpret_cast<ArvGvStream*>(stream.p_arv_stream));
+                tuneGvStream(reinterpret_cast<ArvGvStream*>(stream.p_arv_stream));
 
                 num_opened_streams++;
                 break;
@@ -663,7 +663,7 @@ void CameraDriverGv::spawn_camera_streams()
             std::make_tuple(this, i)));
 
         g_signal_connect(STREAM.p_arv_stream, "new-buffer",
-                         (GCallback)CameraDriverGv::handle_new_buffer_signal,
+                         (GCallback)CameraDriverGv::handleNewBufferSignal,
                          new_buffer_cb_data_ptrs.back().get());
 
         arv_stream_set_emit_signals(STREAM.p_arv_stream, TRUE);
@@ -674,7 +674,7 @@ void CameraDriverGv::spawn_camera_streams()
     CHECK_GERROR(err, logger_);
 
     //--- print final output message
-    std::string camera_guid_str = CameraAravisNodeBase::construct_camera_guid_str(p_camera_);
+    std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
     RCLCPP_INFO(logger_, "Done initializing.");
     RCLCPP_INFO(logger_, "\tCamera: %s", camera_guid_str.c_str());
     RCLCPP_INFO(logger_, "\tNum. Streams: (%i / %i)",
@@ -684,7 +684,7 @@ void CameraDriverGv::spawn_camera_streams()
 }
 
 //==================================================================================================
-void CameraDriverGv::tune_gv_stream(ArvGvStream* p_stream) const
+void CameraDriverGv::tuneGvStream(ArvGvStream* p_stream) const
 {
     if (!p_stream)
         return;
@@ -718,7 +718,7 @@ void CameraDriverGv::tune_gv_stream(ArvGvStream* p_stream) const
 }
 
 //==================================================================================================
-void CameraDriverGv::process_stream_buffer(const uint stream_id)
+void CameraDriverGv::processStreamBuffer(const uint stream_id)
 {
     using namespace std::chrono_literals;
 
@@ -740,7 +740,7 @@ void CameraDriverGv::process_stream_buffer(const uint stream_id)
             continue;
 
         //--- check that image roi corresponds to actual image in buffer
-        if (adjust_image_roi(stream.image_roi, p_arv_buffer))
+        if (adjustImageRoi(stream.image_roi, p_arv_buffer))
         {
             RCLCPP_WARN(logger_,
                         "Image region specified for stream %i (%s) doesn't match received. "
@@ -751,7 +751,7 @@ void CameraDriverGv::process_stream_buffer(const uint stream_id)
         }
 
         //--- set meta data of image message
-        fill_image_msg_metadata(p_img_msg, p_arv_buffer, stream.sensor, stream.image_roi);
+        fillImageMsgMetadata(p_img_msg, p_arv_buffer, stream.sensor, stream.image_roi);
 
         //--- convert to ros format
         if (stream.cvt_pixel_format)
@@ -763,7 +763,7 @@ void CameraDriverGv::process_stream_buffer(const uint stream_id)
         }
 
         //--- fill camera_info message
-        fill_camera_info_msg(stream, p_img_msg);
+        fillCameraInfoMsg(stream, p_img_msg);
 
         //--- publish
         stream.camera_pub.publish(p_img_msg, stream.p_cam_info_msg);
@@ -774,7 +774,7 @@ void CameraDriverGv::process_stream_buffer(const uint stream_id)
 }
 
 //==================================================================================================
-bool CameraDriverGv::adjust_image_roi(ImageRoi& img_roi, ArvBuffer* p_buffer) const
+bool CameraDriverGv::adjustImageRoi(ImageRoi& img_roi, ArvBuffer* p_buffer) const
 {
     gint x, y, width, height;
 
@@ -792,7 +792,7 @@ bool CameraDriverGv::adjust_image_roi(ImageRoi& img_roi, ArvBuffer* p_buffer) co
 }
 
 //==================================================================================================
-void CameraDriverGv::fill_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
+void CameraDriverGv::fillImageMsgMetadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
                                              ArvBuffer* p_buffer,
                                              const Sensor& sensor,
                                              const ImageRoi& img_roi) const
@@ -812,7 +812,7 @@ void CameraDriverGv::fill_image_msg_metadata(sensor_msgs::msg::Image::SharedPtr&
 }
 
 //==================================================================================================
-void CameraDriverGv::fill_camera_info_msg(Stream& stream,
+void CameraDriverGv::fillCameraInfoMsg(Stream& stream,
                                           const sensor_msgs::msg::Image::SharedPtr& p_img_msg) const
 {
     //--- reset pointer to camera_info message, if not already set
@@ -842,7 +842,7 @@ void CameraDriverGv::fill_camera_info_msg(Stream& stream,
 }
 
 //==================================================================================================
-void CameraDriverGv::print_stream_statistics() const
+void CameraDriverGv::printStreamStatistics() const
 {
     for (uint i = 0; i < streams_.size(); i++)
     {
@@ -876,7 +876,7 @@ void CameraDriverGv::print_stream_statistics() const
 }
 
 //==================================================================================================
-void CameraDriverGv::handle_new_buffer_signal(ArvStream* p_stream, gpointer p_user_data)
+void CameraDriverGv::handleNewBufferSignal(ArvStream* p_stream, gpointer p_user_data)
 {
     ///--- get data tuples from user data
     std::tuple<CameraDriverGv*, uint>* p_data_tuple =
