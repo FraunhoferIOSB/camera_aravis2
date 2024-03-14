@@ -238,6 +238,20 @@ class CameraDriverGv : public CameraAravisNodeBase
     [[nodiscard]] bool setImageFormatControlSettings();
 
     /**
+     * @brief Get parameter with 'parameter_name' within the list of acquisition control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within acquisition control.
+     * The method will prepend 'AcquisitionControl.' to the parameter prior to the search.
+     * @param[out] param_value Parameter value.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] inline bool getAcquisitionControlParameter(
+      const std::string& param_name,
+      rclcpp::ParameterValue& param_value);
+
+    /**
      * @brief Set acquisition control settings of the camera.
      *
      * @return True if successful. False, otherwise.

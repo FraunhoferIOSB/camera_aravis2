@@ -175,8 +175,6 @@ void CameraDriverGv::setUpParameters()
       "frame ID is specified, the name of the node will be used.";
     declare_parameter<std::string>("frame_id", "", frame_id_desc);
 
-    //--- image format parameters
-
     auto pixel_formats_desc = rcl_interfaces::msg::ParameterDescriptor{};
     pixel_formats_desc.description =
       "String list of pixel formats associated with each "
@@ -185,33 +183,6 @@ void CameraDriverGv::setUpParameters()
       "the size of the shorter one.";
     declare_parameter<std::vector<std::string>>("pixel_formats", std::vector<std::string>({}),
                                                 pixel_formats_desc);
-    //--- acquisition parameters
-
-    auto acquisition_mode_desc = rcl_interfaces::msg::ParameterDescriptor{};
-    acquisition_mode_desc.description =
-      "Acquisition mode that is to be set. Supported Values: "
-      "'Continuous', 'MultiFrame', 'SingleFrame'. "
-      "Default : 'Continuous'.";
-    declare_parameter<std::string>("acquisition_mode", "Continuous", acquisition_mode_desc);
-
-    auto frame_count_desc = rcl_interfaces::msg::ParameterDescriptor{};
-    frame_count_desc.description =
-      "Number of frames to be acquired, when 'acquisition_mode' is "
-      "set to 'MultiFrame'. Parameter is not evaluated if other mode "
-      "is selected. Default: 10.";
-    declare_parameter<int>("frame_count", 10, frame_count_desc);
-
-    auto frame_rate_desc = rcl_interfaces::msg::ParameterDescriptor{};
-    frame_rate_desc.description =
-      "Rate (per second) in which to acquire frames. Default: 30.";
-    declare_parameter<double>("frame_rate", 30, frame_rate_desc);
-
-    auto exposure_auto_desc = rcl_interfaces::msg::ParameterDescriptor{};
-    exposure_auto_desc.description =
-      "Acquisition auto mode that is to be set. Supported Values: "
-      "'Off', 'Once', 'Continuous'. "
-      "Default : 'Continuous'.";
-    declare_parameter<std::string>("exposure_auto", "Continuous", exposure_auto_desc);
 }
 
 //==================================================================================================
@@ -401,8 +372,7 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         {
             // TODO(boitumeloruf): make more source selector more generic
             std::string src_selector_val = "Source" + std::to_string(i);
-            is_successful &=
-              setFeatureValue<std::string>("SourceSelector", src_selector_val);
+            setFeatureValue<std::string>("SourceSelector", src_selector_val);
         }
 
         //--- set desired pixel format and get actual value that has been set
@@ -451,9 +421,6 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
             setBoundedFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_min, tmp_max, tmp_param_value, i);
-        else
-            //--- if width not specified, use max width
-            setFeatureValue<int>(tmp_feature_name, image_roi.width_max);
         getFeatureValue<int>(tmp_feature_name, image_roi.width);
 
         //--- image roi height
@@ -469,9 +436,6 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
             setBoundedFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_min, tmp_max, tmp_param_value, i);
-        else
-            //--- if height not specified, use max height
-            setFeatureValue<int>(tmp_feature_name, image_roi.height_max);
         getFeatureValue<int>(tmp_feature_name, image_roi.height);
 
         //--- image roi offset x
@@ -479,9 +443,6 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
             setFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_param_value, i);
-        else
-            //--- if width not specified, use origin
-            setFeatureValue<int>(tmp_feature_name, 0);
         getFeatureValue<int>(tmp_feature_name, image_roi.x);
 
         //--- image roi height
@@ -489,9 +450,6 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
             setFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_param_value, i);
-        else
-            //--- if width not specified, use origin
-            setFeatureValue<int>(tmp_feature_name, 0);
         getFeatureValue<int>(tmp_feature_name, image_roi.y);
 
         // NOTE: Not all parameters are essential, which is why only the success of some parameters
@@ -504,47 +462,102 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 }
 
 //==================================================================================================
+[[nodiscard]] inline bool CameraDriverGv::getAcquisitionControlParameter(
+  const std::string& param_name,
+  rclcpp::ParameterValue& param_value)
+{
+    std::string key = std::string("AcquisitionControl.").append(param_name);
+    if (parameter_overrides_.find(key) != parameter_overrides_.end())
+    {
+        param_value = parameter_overrides_[key];
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+//==================================================================================================
 [[nodiscard]] bool CameraDriverGv::setAcquisitionControlSettings()
 {
-    GuardedGError err;
-    bool is_successful = true;
-
-    //--- Acquisition mode
-    auto acquisition_mode_str = get_parameter("acquisition_mode").as_string();
-    auto acquisition_mode     = arv_acquisition_mode_from_string(acquisition_mode_str.c_str());
-    arv_camera_set_acquisition_mode(p_camera_, acquisition_mode, err.ref());
-    ASSERT_GERROR(err, logger_, is_successful);
-
-    //--- Frame count, if applicable
-    if (acquisition_mode == ARV_ACQUISITION_MODE_MULTI_FRAME)
+    for (uint i = 0; i < streams_.size(); ++i)
     {
-        auto frame_count = get_parameter("frame_count").as_int();
-        arv_camera_set_frame_count(p_camera_, frame_count, err.ref());
-        ASSERT_GERROR(err, logger_, is_successful);
+        std::string tmp_feature_name;
+        rclcpp::ParameterValue tmp_param_value;
+
+        //--- set source, if applicable
+        if (streams_.size() > 1)
+        {
+            // TODO(boitumeloruf): make more source selector more generic
+            std::string src_selector_val = "Source" + std::to_string(i);
+            setFeatureValue<std::string>("SourceSelector", src_selector_val);
+        }
+
+        //--- Acquisition Mode
+        tmp_feature_name = "AcquisitionMode";
+        if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+
+        std::string acquisition_mode_str;
+        getFeatureValue<std::string>(tmp_feature_name, acquisition_mode_str);
+        ArvAcquisitionMode acquisition_mode =
+          arv_acquisition_mode_from_string(acquisition_mode_str.c_str());
+
+        //--- Acquisition Frame Count
+        if (acquisition_mode == ARV_ACQUISITION_MODE_MULTI_FRAME)
+        {
+            tmp_feature_name = "AcquisitionFrameCount";
+            if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
+                setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
+        }
+
+        //--- Exposure Auto
+        tmp_feature_name = "ExposureAuto";
+        if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+
+        std::string exposure_auto_str;
+        getFeatureValue<std::string>(tmp_feature_name, exposure_auto_str);
+        ArvAuto exposure_auto = arv_auto_from_string(exposure_auto_str.c_str());
+
+        //--- Exposure Mode
+        tmp_feature_name = "ExposureMode";
+        if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+
+        std::string exposure_mode_str;
+        getFeatureValue<std::string>(tmp_feature_name, exposure_mode_str);
+        ArvExposureMode exposure_mode = arv_exposure_mode_from_string(exposure_mode_str.c_str());
+
+        //--- Exposure Time
+        if (exposure_auto == ARV_AUTO_OFF && exposure_mode == ARV_EXPOSURE_MODE_TIMED)
+        {
+            tmp_feature_name = "ExposureTime";
+            if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
+                setFeatureValueFromParameter<double>(tmp_feature_name, tmp_param_value, i);
+        }
+
+        //--- Acquisition Frame Rate
+        tmp_feature_name = "AcquisitionFrameRateEnable";
+        if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value, i);
+
+        bool isFrameRateEnable = true;
+        getFeatureValue<bool>(tmp_feature_name, isFrameRateEnable);
+
+        tmp_feature_name = "AcquisitionFrameRate";
+        if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
+        {
+            if (isFrameRateEnable)
+                setFeatureValueFromParameter<double>(tmp_feature_name, tmp_param_value, i);
+            else
+                RCLCPP_WARN(logger_, "Could not set frame rate. AcquisitionFrameRateEnable: %s",
+                            (isFrameRateEnable) ? "true" : "false");
+        }
     }
 
-    //--- Frame rate
-    // TODO: currently faulting
-    // if (arv_camera_is_frame_rate_available(p_camera_, err.ref()))
-    // {
-    //     auto frame_rate = get_parameter("frame_rate").as_double();
-    //     arv_camera_set_frame_rate(p_camera_, frame_rate, err.ref());
-    // }
-    // ASSERT_GERROR(err, logger_, is_successful);
-
-    //--- Exposure
-    if (arv_camera_is_exposure_auto_available(p_camera_, err.ref()))
-    {
-        auto exposure_auto_str = get_parameter("exposure_auto").as_string();
-        auto exposure_auto     = arv_auto_from_string(exposure_auto_str.c_str());
-        arv_camera_set_exposure_time_auto(p_camera_, exposure_auto, err.ref());
-    }
-    ASSERT_GERROR(err, logger_, is_successful);
-
-    arv_camera_set_exposure_mode(p_camera_, ARV_EXPOSURE_MODE_TIMED, err.ref());
-    ASSERT_GERROR(err, logger_, is_successful);
-
-    return is_successful;
+    return true;
 }
 
 //==================================================================================================
@@ -793,9 +806,9 @@ bool CameraDriverGv::adjustImageRoi(ImageRoi& img_roi, ArvBuffer* p_buffer) cons
 
 //==================================================================================================
 void CameraDriverGv::fillImageMsgMetadata(sensor_msgs::msg::Image::SharedPtr& p_img_msg,
-                                             ArvBuffer* p_buffer,
-                                             const Sensor& sensor,
-                                             const ImageRoi& img_roi) const
+                                          ArvBuffer* p_buffer,
+                                          const Sensor& sensor,
+                                          const ImageRoi& img_roi) const
 {
     //--- fill header data
 
@@ -813,7 +826,7 @@ void CameraDriverGv::fillImageMsgMetadata(sensor_msgs::msg::Image::SharedPtr& p_
 
 //==================================================================================================
 void CameraDriverGv::fillCameraInfoMsg(Stream& stream,
-                                          const sensor_msgs::msg::Image::SharedPtr& p_img_msg) const
+                                       const sensor_msgs::msg::Image::SharedPtr& p_img_msg) const
 {
     //--- reset pointer to camera_info message, if not already set
     if (!stream.p_cam_info_msg)

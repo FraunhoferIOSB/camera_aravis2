@@ -276,6 +276,8 @@ bool CameraAravisNodeBase::setFeatureValueFromParameter(
 {
     T value;
 
+    // TODO: Catch rclcpp::ParameterTypeException and print feature name
+
     //--- check if single parameter of parameter array
     //--- BYTE_ARRAY is the first 'array' type in the list
     if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
@@ -314,6 +316,8 @@ bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
   const uint& idx) const
 {
     T bounded_value;
+
+    // TODO: Catch rclcpp::ParameterTypeException and print feature name
 
     //--- check if single parameter of parameter array
     //--- BYTE_ARRAY is the first 'array' type in the list
