@@ -75,17 +75,18 @@ bool CameraAravisNodeBase::isInitialized() const
     auto n_interfaces = arv_get_n_interfaces();
     auto n_devices    = arv_get_n_devices();
 
-    RCLCPP_INFO(logger_, "Attached cameras:");
-    RCLCPP_INFO(logger_, "\tNum. Interfaces: %d", n_interfaces);
-    RCLCPP_INFO(logger_, "\tNum. Devices: %d", n_devices);
-    for (uint i = 0; i < n_devices; i++)
-        RCLCPP_INFO(logger_, "\tDevice %d: %s", i, arv_get_device_id(i));
-
     if (n_devices == 0)
     {
         RCLCPP_FATAL(logger_, "No cameras detected.");
         return false;
     }
+
+    RCLCPP_INFO(logger_, "Attached cameras (Num. Interfaces: %d | Num. Devices: %d):",
+                n_interfaces, n_devices);
+    for (uint i = 0; i < n_devices; i++)
+        RCLCPP_INFO(logger_, "\tDevice %d: %s (%s)", i,
+                    arv_get_device_id(i),
+                    arv_get_device_address(i));
 
     return true;
 }
