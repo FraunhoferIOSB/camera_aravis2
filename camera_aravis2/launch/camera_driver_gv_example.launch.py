@@ -65,10 +65,10 @@ def generate_launch_description():
                         "OffsetY": 8,
                     },
                     "AcquisitionControl": {
-                        "ExposureTime": 100000.0,
+                        "ExposureTime": 10000.0,
                         "ExposureAuto": "Off",
                         "ExposureMode": "Timed",
-                        "AcquisitionFrameRate": 8.0
+                        "AcquisitionFrameRate": 80.0
                     }
                 }
             ]
