@@ -95,6 +95,12 @@ add_executable(${CAMERA_DRIVER_UV_EXEC_NAME} src/camera_driver_uv_main.cpp)
 target_link_libraries(${CAMERA_DRIVER_UV_EXEC_NAME} ${LIBRARY_NAME})
 rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraDriverUv")
 
+# camera_finder node
+
+set(CAMERA_FINDER_EXEC_NAME camera_finder)
+add_executable(${CAMERA_FINDER_EXEC_NAME} src/camera_finder_main.cpp)
+target_link_libraries(${CAMERA_FINDER_EXEC_NAME} ${LIBRARY_NAME})
+
 # camera_xml_exporter node
 
 set(CAMERA_XML_EXPORTER_EXEC_NAME camera_xml_exporter)
@@ -111,7 +117,10 @@ install(TARGETS ${LIBRARY_NAME}
 )
 
 install(TARGETS
-  ${CAMERA_DRIVER_GV_EXEC_NAME} ${CAMERA_DRIVER_UV_EXEC_NAME} ${CAMERA_XML_EXPORTER_EXEC_NAME}
+  ${CAMERA_DRIVER_GV_EXEC_NAME}
+  ${CAMERA_DRIVER_UV_EXEC_NAME}
+  ${CAMERA_FINDER_EXEC_NAME}
+  ${CAMERA_XML_EXPORTER_EXEC_NAME}
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 

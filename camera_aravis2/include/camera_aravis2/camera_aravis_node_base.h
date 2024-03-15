@@ -73,6 +73,12 @@ class CameraAravisNodeBase : public rclcpp::Node
      */
     bool isInitialized() const;
 
+    /**
+     * @brief List available camera devices.
+     *
+     */
+    [[nodiscard]] bool listAvailableCameraDevices() const;
+
   protected:
     /**
      * @brief Set the up launch parameters.

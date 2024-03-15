@@ -67,20 +67,8 @@ bool CameraAravisNodeBase::isInitialized() const
 }
 
 //==================================================================================================
-void CameraAravisNodeBase::setUpParameters()
+[[nodiscard]] bool CameraAravisNodeBase::listAvailableCameraDevices() const
 {
-    auto guid_desc = rcl_interfaces::msg::ParameterDescriptor{};
-    guid_desc.description =
-      "Serial number of camera that is to be opened.";
-    declare_parameter<std::string>("guid", "", guid_desc);
-}
-
-//==================================================================================================
-[[nodiscard]] bool CameraAravisNodeBase::discoverAndOpenCameraDevice()
-{
-    // Guarded error object
-    GuardedGError err;
-
     //--- Discover available interfaces and devices.
 
     arv_update_device_list();
@@ -98,6 +86,30 @@ void CameraAravisNodeBase::setUpParameters()
         RCLCPP_FATAL(logger_, "No cameras detected.");
         return false;
     }
+
+    return true;
+}
+
+//==================================================================================================
+void CameraAravisNodeBase::setUpParameters()
+{
+    auto guid_desc = rcl_interfaces::msg::ParameterDescriptor{};
+    guid_desc.description =
+      "Serial number of camera that is to be opened.";
+    declare_parameter<std::string>("guid", "", guid_desc);
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraAravisNodeBase::discoverAndOpenCameraDevice()
+{
+    // Guarded error object
+    GuardedGError err;
+
+    //--- Discover available interfaces and devices.
+
+    bool is_successful = listAvailableCameraDevices();
+    if (!is_successful)
+        return false;
 
     //--- connect to camera specified by guid parameter
     guid_ = get_parameter("guid").as_string();
