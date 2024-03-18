@@ -52,10 +52,13 @@ namespace camera_aravis2
 CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
   CameraAravisNodeBase("camera_driver_gv", options),
   is_spawning_(false),
+  is_verbose_enable_(false),
   use_ptp_timestamp_(false)
 {
     //--- setup parameters
     setUpParameters();
+
+    is_verbose_enable_ = get_parameter("verbose").as_bool();
 
     //--- get parameter overrides, i.e. all parameters, including those that are not declared
     parameter_overrides_ = this->get_node_parameters_interface()->get_parameter_overrides();
@@ -78,6 +81,9 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
 
     //--- set standard camera settings
     ASSERT_SUCCESS(setAcquisitionControlSettings());
+
+    //--- print currently applied camera configuration
+    printCameraConfiguration();
 
     //--- spawn camera stream in thread, so that initialization is not blocked
     is_spawning_         = true;
@@ -179,6 +185,11 @@ void CameraDriverGv::setUpParameters()
       "stream name is appended, together with '_' as separator. If no "
       "frame ID is specified, the name of the node will be used.";
     declare_parameter<std::string>("frame_id", "", frame_id_desc);
+
+    auto verbose_desc = rcl_interfaces::msg::ParameterDescriptor{};
+    verbose_desc.description =
+      "Activate verbose output.";
+    declare_parameter<bool>("verbose", false, verbose_desc);
 }
 
 //==================================================================================================
@@ -305,12 +316,12 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 //==================================================================================================
 [[nodiscard]] inline bool CameraDriverGv::getImageFormatControlParameter(
   const std::string& param_name,
-  rclcpp::ParameterValue& param_value)
+  rclcpp::ParameterValue& param_value) const
 {
     std::string key = std::string("ImageFormatControl.").append(param_name);
     if (parameter_overrides_.find(key) != parameter_overrides_.end())
     {
-        param_value = parameter_overrides_[key];
+        param_value = parameter_overrides_.at(key);
         return true;
     }
     else
@@ -437,12 +448,12 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 //==================================================================================================
 [[nodiscard]] inline bool CameraDriverGv::getAcquisitionControlParameter(
   const std::string& param_name,
-  rclcpp::ParameterValue& param_value)
+  rclcpp::ParameterValue& param_value) const
 {
     std::string key = std::string("AcquisitionControl.").append(param_name);
     if (parameter_overrides_.find(key) != parameter_overrides_.end())
     {
-        param_value = parameter_overrides_[key];
+        param_value = parameter_overrides_.at(key);
         return true;
     }
     else
@@ -662,8 +673,8 @@ void CameraDriverGv::spawnCameraStreams()
     //--- print final output message
     std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
     RCLCPP_INFO(logger_, "Done initializing.");
-    RCLCPP_INFO(logger_, "\tCamera: %s", camera_guid_str.c_str());
-    RCLCPP_INFO(logger_, "\tNum. Streams: (%i / %i)",
+    RCLCPP_INFO(logger_, "  Camera:        %s", camera_guid_str.c_str());
+    RCLCPP_INFO(logger_, "  Num. Streams:  (%i / %i)",
                 num_opened_streams, static_cast<int>(streams_.size()));
 
     this->is_initialized_ = true;
@@ -828,6 +839,78 @@ void CameraDriverGv::fillCameraInfoMsg(Stream& stream,
 }
 
 //==================================================================================================
+void CameraDriverGv::printCameraConfiguration() const
+{
+
+    RCLCPP_INFO(logger_, "======================================");
+    RCLCPP_INFO(logger_, "Camera Configuration:");
+    RCLCPP_INFO(logger_, "--------------------------------------");
+    RCLCPP_INFO(logger_, "  GUID:                  %s", guid_.c_str());
+    if (is_verbose_enable_)
+    {
+        RCLCPP_INFO(logger_, "  Type:                  %s",
+                    arv_camera_is_gv_device(p_camera_)
+                      ? "GigEVision"
+                      : (arv_camera_is_uv_device(p_camera_)
+                           ? "USB3Vision"
+                           : "Other"));
+        RCLCPP_INFO(logger_, "  Num. Streams:          %i",
+                    static_cast<int>(streams_.size()));
+    }
+
+    for (uint i = 0; i < streams_.size(); i++)
+    {
+        const Stream& stream = streams_[i];
+        const Sensor& sensor = stream.sensor;
+        const ImageRoi& roi  = stream.image_roi;
+
+        rclcpp::ParameterValue tmp_param_value;
+        RCLCPP_INFO(logger_, "  - - - - - - - - - - - - - - - - - - ");
+        RCLCPP_INFO(logger_, "  Stream %i:              %s", i, stream.name.c_str());
+        RCLCPP_INFO(logger_, "  - - - - - - - - - - - - - - - - - - ");
+
+        if (is_verbose_enable_)
+        {
+            RCLCPP_INFO(logger_, "    Camera Info:         %s", stream.camera_info_url.c_str());
+            RCLCPP_INFO(logger_, "    Topic:               %s", stream.camera_pub.getTopic().c_str());
+            RCLCPP_INFO(logger_, "    Frame ID:            %s", sensor.frame_id.c_str());
+        }
+
+        RCLCPP_INFO(logger_, "    Sensor Size:         %ix%i", sensor.width, sensor.height);
+
+        if (getImageFormatControlParameter("PixelFormat", tmp_param_value) || is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Pixel Format:        %s", sensor.pixel_format.c_str());
+
+        if (is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Bits/Pixel:          %i",
+                        static_cast<int>(sensor.n_bits_pixel));
+
+        if (getImageFormatControlParameter("ReverseX", tmp_param_value) ||
+            getImageFormatControlParameter("ReverseY", tmp_param_value) ||
+            is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Reverse X,Y:         %s,%s",
+                        (sensor.reverse_x) ? "True" : "False",
+                        (sensor.reverse_y) ? "True" : "False");
+
+        if (getImageFormatControlParameter("OffsetX", tmp_param_value) ||
+            getImageFormatControlParameter("OffsetY", tmp_param_value) ||
+            is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Image Offset X,Y:    %i,%i", roi.x, roi.y);
+
+        if (getImageFormatControlParameter("Width", tmp_param_value) ||
+            getImageFormatControlParameter("Height", tmp_param_value) ||
+            is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Image Size:          %ix%i", roi.width, roi.height);
+        if (is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Image Width Bound:   [%i,%i]",
+                        roi.width_min, roi.width_max);
+        if (is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Image Height Bound:  [%i,%i]",
+                        roi.height_min, roi.height_max);
+    }
+}
+
+//==================================================================================================
 void CameraDriverGv::printStreamStatistics() const
 {
     for (uint i = 0; i < streams_.size(); i++)
@@ -844,9 +927,9 @@ void CameraDriverGv::printStreamStatistics() const
                                   &n_completed_buffers, &n_failures, &n_underruns);
 
         RCLCPP_INFO(logger_, "Statistics for stream %i (%s):", i, STREAM.sensor.frame_id.c_str());
-        RCLCPP_INFO(logger_, "\tCompleted buffers = %li", (uint64_t)n_completed_buffers);
-        RCLCPP_INFO(logger_, "\tFailures          = %li", (uint64_t)n_failures);
-        RCLCPP_INFO(logger_, "\tUnderruns         = %li", (uint64_t)n_underruns);
+        RCLCPP_INFO(logger_, "  Completed buffers = %li", (uint64_t)n_completed_buffers);
+        RCLCPP_INFO(logger_, "  Failures          = %li", (uint64_t)n_failures);
+        RCLCPP_INFO(logger_, "  Underruns         = %li", (uint64_t)n_underruns);
 
         if (arv_camera_is_gv_device(p_camera_))
         {
@@ -855,8 +938,8 @@ void CameraDriverGv::printStreamStatistics() const
 
             arv_gv_stream_get_statistics(reinterpret_cast<ArvGvStream*>(STREAM.p_arv_stream),
                                          &n_resent, &n_missing);
-            RCLCPP_INFO(logger_, "\tResent buffers    = %li", (uint64_t)n_resent);
-            RCLCPP_INFO(logger_, "\tMissing           = %li", (uint64_t)n_missing);
+            RCLCPP_INFO(logger_, "  Resent buffers    = %li", (uint64_t)n_resent);
+            RCLCPP_INFO(logger_, "  Missing           = %li", (uint64_t)n_missing);
         }
     }
 }

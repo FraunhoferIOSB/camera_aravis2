@@ -226,7 +226,7 @@ class CameraDriverGv : public CameraAravisNodeBase
      */
     [[nodiscard]] inline bool getImageFormatControlParameter(
       const std::string& param_name,
-      rclcpp::ParameterValue& param_value);
+      rclcpp::ParameterValue& param_value) const;
 
     /**
      * @brief Set image format control settings of the camera.
@@ -249,7 +249,7 @@ class CameraDriverGv : public CameraAravisNodeBase
      */
     [[nodiscard]] inline bool getAcquisitionControlParameter(
       const std::string& param_name,
-      rclcpp::ParameterValue& param_value);
+      rclcpp::ParameterValue& param_value) const;
 
     /**
      * @brief Set acquisition control settings of the camera.
@@ -314,6 +314,11 @@ class CameraDriverGv : public CameraAravisNodeBase
                            const sensor_msgs::msg::Image::SharedPtr& p_img_msg) const;
 
     /**
+     * @brief Print currently applied camera configuration.
+     */
+    void printCameraConfiguration() const;
+
+    /**
      * @brief Print stream statistics, such as completed and failed buffers.
      */
     void printStreamStatistics() const;
@@ -343,6 +348,9 @@ class CameraDriverGv : public CameraAravisNodeBase
 
     /// List of pointers to data tuples for the new-buffer callback.
     std::vector<std::shared_ptr<std::tuple<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;
+
+    /// Flag indicating verbose output.
+    bool is_verbose_enable_;
 
     /// Flag indicating to use PTP timestamp.
     bool use_ptp_timestamp_;

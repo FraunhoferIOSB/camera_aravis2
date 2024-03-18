@@ -84,7 +84,7 @@ bool CameraAravisNodeBase::isInitialized() const
     RCLCPP_INFO(logger_, "Attached cameras (Num. Interfaces: %d | Num. Devices: %d):",
                 n_interfaces, n_devices);
     for (uint i = 0; i < n_devices; i++)
-        RCLCPP_INFO(logger_, "\tDevice %d: %s (%s)", i,
+        RCLCPP_INFO(logger_, "  Device %d: %s (%s)", i,
                     arv_get_device_id(i),
                     arv_get_device_address(i));
 
@@ -399,7 +399,7 @@ void CameraAravisNodeBase::handleControlLostSignal(ArvDevice* p_device, gpointer
         return;
 
     RCLCPP_FATAL(p_ca_instance->logger_, "Control to aravis device lost.");
-    RCLCPP_FATAL(p_ca_instance->logger_, "\tGUID: %s", p_ca_instance->guid_.c_str());
+    RCLCPP_FATAL(p_ca_instance->logger_, "  GUID: %s", p_ca_instance->guid_.c_str());
 
     rclcpp::shutdown();
 }
