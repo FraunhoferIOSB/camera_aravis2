@@ -841,7 +841,6 @@ void CameraDriverGv::fillCameraInfoMsg(Stream& stream,
 //==================================================================================================
 void CameraDriverGv::printCameraConfiguration() const
 {
-
     RCLCPP_INFO(logger_, "======================================");
     RCLCPP_INFO(logger_, "Camera Configuration:");
     RCLCPP_INFO(logger_, "--------------------------------------");
@@ -872,7 +871,8 @@ void CameraDriverGv::printCameraConfiguration() const
         if (is_verbose_enable_)
         {
             RCLCPP_INFO(logger_, "    Camera Info:         %s", stream.camera_info_url.c_str());
-            RCLCPP_INFO(logger_, "    Topic:               %s", stream.camera_pub.getTopic().c_str());
+            RCLCPP_INFO(logger_, "    Topic:               %s",
+                        stream.camera_pub.getTopic().c_str());
             RCLCPP_INFO(logger_, "    Frame ID:            %s", sensor.frame_id.c_str());
         }
 
