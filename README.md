@@ -1,8 +1,8 @@
 # camera_aravis2
 
-An actively maintained ROS2 camera driver for [GenICam](https://www.emva.org/standards-technology/genicam/)-based (GigEVision and USB3Vision) cameras. 
+An actively maintained ROS 2 camera driver for [GenICam](https://www.emva.org/standards-technology/genicam/)-based (GigEVision and USB3Vision) cameras. 
 It is a subsequent development of [camera_aravis](https://github.com/FraunhoferIOSB/camera_aravis), but in order to clean up some legacy code and, in turn, support new features mor easily, we opted to implement it with a new code-base. 
-It is open source under the 3-clause BSD license.
+It is open sourced under the 3-clause BSD license.
 
 It relies on the [Aravis](http://live.gnome.org/Aravis) library to access the GigEVision and USB3Vision cameras. 
 Aravis is a glib/gobject based library for video acquisition using GenICam cameras. 
@@ -49,11 +49,11 @@ The configuration of the camera driver is divided into a driver-specific and Gen
 - `guid`: Serial number of the camera that is to be opened. GUIDs of available cameras can be discovered with [`camera_finder`](#finding-available-cameras) node.
     - Type: String
     - Default: ""
-    - Optional. If omitted any of the listed cameras will be opened.
+    - Optional. If omitted a random camera is picked from the list of connected cameras and will be opened.
 - `stream_names`: String list of names that are to be associated with each stream. If multiple streams are available, these names will be appended to the topic names in order to distinguish the different image streams.
     - Type: String-Array
     - Default: {}
-    - Optional.If omitted or less names are given than streams available, each stream will get given a name based on its ID, starting with 0.
+    - Optional. If omitted or less names are given than streams available, each stream will get given a name based on its ID, starting with 0.
 - `camera_info_urls`: String list of urls to camera_info files associated with each stream. List should have the same length as the number of streams provided by the camera. If the number of URLs does not correspond to number of streams available, the minimum of both is used to set the number of streams that are to be established.
     - Type: String-Array
     - Default: {}
@@ -174,7 +174,7 @@ arv-tool-0.8 --name=<camera_guid> genicam
 **camera_aravis2**:
 
 - Aravis 0.8 or later
-- ROS2
+- ROS 2
 - cv_bridge
 - image_transport
 - camera_info_manager
@@ -184,7 +184,7 @@ arv-tool-0.8 --name=<camera_guid> genicam
 
 **camera_aravis2_msgs**:
 
-- ROS2
+- ROS 2
 - std_msgs
 - sensor_msgs
 
@@ -201,7 +201,7 @@ rosdep install --from-paths src -y --ignore-src
 Run `colcon` to build from source:
 
 ```bash
-colcon build --symlink-install
+colcon build --symlink-install --packages-up-to camera_aravis2
 ```
 
 To build in 'Debug' mode add `--cmake-args -DCMAKE_BUILD_TYPE=Debug` to colcon command.
