@@ -52,13 +52,13 @@ def generate_launch_description():
         parameters=[
                 {
                     "guid": "Allied Vision-Alvium G1-240c-05P3C",
-                    "stream_names": ["vis"],
-                    "pixel_formats": ["BayerRG8"],
                     "frame_id": "camera_gv",
+                    "stream_names": ["vis"],
                     "camera_info_urls": ["file://" + os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example.yaml')],
                     "ImageFormatControl": {
+                        "PixelFormat": "BayerRG8",
                         "Width": 1920,
                         "Height": 1200,
                         "OffsetX": 8,
@@ -68,7 +68,7 @@ def generate_launch_description():
                         "ExposureTime": 10000.0,
                         "ExposureAuto": "Off",
                         "ExposureMode": "Timed",
-                        "AcquisitionFrameRate": 80.0
+                        "AcquisitionFrameRate": 30.0
                     }
                 }
             ]

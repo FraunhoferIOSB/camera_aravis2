@@ -174,15 +174,6 @@ void CameraDriverGv::setUpParameters()
       "stream name is appended, together with '_' as separator. If no "
       "frame ID is specified, the name of the node will be used.";
     declare_parameter<std::string>("frame_id", "", frame_id_desc);
-
-    auto pixel_formats_desc = rcl_interfaces::msg::ParameterDescriptor{};
-    pixel_formats_desc.description =
-      "String list of pixel formats associated with each "
-      "stream. List must have the same length as 'camera_info_urls'. "
-      "If both lists have different lengths, they are truncated to "
-      "the size of the shorter one.";
-    declare_parameter<std::vector<std::string>>("pixel_formats", std::vector<std::string>({}),
-                                                pixel_formats_desc);
 }
 
 //==================================================================================================
@@ -192,66 +183,43 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
     int num_streams       = discoverNumberOfStreams();
     auto stream_names     = get_parameter("stream_names").as_string_array();
-    auto pixel_formats    = get_parameter("pixel_formats").as_string_array();
     auto camera_info_urls = get_parameter("camera_info_urls").as_string_array();
     auto base_frame_id    = get_parameter("frame_id").as_string();
 
     bool is_camera_info_url_param_empty = camera_info_urls.empty();
 
-    //--- check that at least one pixel format and one camera_info_url is specified
-    if (pixel_formats.empty())
-    {
-        RCLCPP_FATAL(logger_, "At least one 'pixel_format' needs to be specified.");
-        return false;
-    }
+    //--- check if one camera_info_url is specified
     if (is_camera_info_url_param_empty)
     {
         RCLCPP_WARN(logger_, "No camera_info_url specified. Initializing from camera GUID.");
 
         // Here only empty strings are pushed into list as placeholders. The actual construction of
         // the url is done later, when the stream names are set.
-        for (uint i = 0; i < pixel_formats.size(); i++)
+        for (int i = 0; i < num_streams; i++)
             camera_info_urls.push_back("");
     }
 
-    //--- check if same number of pixel_formats and camera_info_urls are provided
-    if (pixel_formats.size() != camera_info_urls.size())
+    //--- check if number of camera_info_url corresponds to available number of streams
+    if (static_cast<int>(camera_info_urls.size()) != num_streams)
     {
-        RCLCPP_WARN(logger_,
-                    "Different number of 'pixel_formats' and 'camera_info_urls' specified.");
-
-        if (pixel_formats.size() < camera_info_urls.size())
+        if (static_cast<int>(camera_info_urls.size()) > num_streams)
         {
-            camera_info_urls.resize(pixel_formats.size());
-            RCLCPP_WARN(logger_,
-                        "Truncating 'camera_info_urls' to first %i elements.",
-                        static_cast<int>(pixel_formats.size()));
-        }
-        else
-        {
-            pixel_formats.resize(camera_info_urls.size());
-            RCLCPP_WARN(logger_,
-                        "Truncating 'pixel_formats' to first %i elements.",
-                        static_cast<int>(camera_info_urls.size()));
-        }
-    }
-
-    //--- check if number pixel_formats corresponds to available number of streams
-    if (static_cast<int>(pixel_formats.size()) != num_streams)
-    {
-        if (static_cast<int>(pixel_formats.size()) > num_streams)
-        {
-            pixel_formats.resize(num_streams);
             camera_info_urls.resize(num_streams);
             RCLCPP_WARN(logger_,
                         "Insufficient number of streams supported by camera.");
             RCLCPP_WARN(logger_,
-                        "Truncating 'pixel_formats' and 'camera_info_urls' to first %i elements.",
+                        "Truncating 'camera_info_urls' to first %i elements.",
                         num_streams);
         }
         else
         {
-            num_streams = static_cast<int>(pixel_formats.size());
+            RCLCPP_WARN(logger_,
+                        "Insufficient 'camera_info_urls' specified.");
+            RCLCPP_WARN(logger_,
+                        "only instantiating %i streams (corresponding to  number of "
+                        "'camera_info_urls').",
+                        static_cast<int>(camera_info_urls.size()));
+            num_streams = static_cast<int>(camera_info_urls.size());
         }
     }
 
@@ -277,9 +245,6 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         stream.sensor.frame_id = (!stream_names.empty() || num_streams > 1)
                                    ? base_frame_id + "_" + stream.name
                                    : base_frame_id;
-
-        //--- get pixel format
-        stream.sensor.pixel_format = pixel_formats[i];
 
         //--- get camera_info url
         if (is_camera_info_url_param_empty)
@@ -376,8 +341,10 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         }
 
         //--- set desired pixel format and get actual value that has been set
-        is_successful &= setFeatureValue<std::string>("PixelFormat", sensor.pixel_format);
-        is_successful &= getFeatureValue<std::string>("PixelFormat", sensor.pixel_format);
+        tmp_feature_name = "PixelFormat";
+        if (getImageFormatControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<std::string>(tmp_feature_name, sensor.pixel_format);
 
         //--- get conversion function and number of bits per pixel corresponding to pixel format
         const auto itr = CONVERSIONS_DICTIONARY.find(sensor.pixel_format);
