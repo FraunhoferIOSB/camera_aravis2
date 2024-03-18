@@ -289,24 +289,32 @@ bool CameraAravisNodeBase::setFeatureValueFromParameter(
 {
     T value;
 
-    // TODO: Catch rclcpp::ParameterTypeException and print feature name
-
-    //--- check if single parameter of parameter array
-    //--- BYTE_ARRAY is the first 'array' type in the list
-    if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+    try
     {
-        value = parameter_value.get<T>();
+        //--- check if single parameter of parameter array
+        //--- BYTE_ARRAY is the first 'array' type in the list
+        if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+        {
+            value = parameter_value.get<T>();
+        }
+        else
+        {
+            // List of values that are to be set. If the list is smaller than the number of streams
+            // the last value of the is used for the remaining streams.
+            std::vector<T> value_list = parameter_value.get<std::vector<T>>();
+
+            if (value_list.empty())
+                return false;
+
+            value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
+        }
     }
-    else
+    catch (const rclcpp::ParameterTypeException& e)
     {
-        // List of values that are to be set. If the list is smaller than the number of streams
-        // the last value of the is used for the remaining streams.
-        std::vector<T> value_list = parameter_value.get<std::vector<T>>();
-
-        if (value_list.empty())
-            return false;
-
-        value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
+        RCLCPP_ERROR(logger_, "Exception while trying to set value for '%s'. "
+                              "Reason: %s",
+                     feature_name.c_str(), e.what());
+        return false;
     }
 
     return setFeatureValue<T>(feature_name, value);
