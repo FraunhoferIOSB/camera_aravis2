@@ -51,12 +51,15 @@ def generate_launch_description():
         # arguments=['--ros-args', '--log-level', 'debug'],
         parameters=[
                 {
+                    # Driver-specific parameters
                     "guid": "Allied Vision-Alvium G1-240c-05P3C",
                     "frame_id": "camera_gv",
                     "stream_names": ["vis"],
                     "camera_info_urls": ["file://" + os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example.yaml')],
+                    
+                    # GenICam-specific parameters
                     "ImageFormatControl": {
                         "PixelFormat": "BayerRG8",
                         "Width": 1920,
@@ -65,7 +68,7 @@ def generate_launch_description():
                         "OffsetY": 8,
                     },
                     "AcquisitionControl": {
-                        "ExposureTime": 10000,
+                        "ExposureTime": 10000.0,
                         "ExposureAuto": "Off",
                         "ExposureMode": "Timed",
                         "AcquisitionFrameRate": 30.0

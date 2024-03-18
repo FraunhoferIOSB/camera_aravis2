@@ -150,19 +150,24 @@ void CameraDriverGv::setUpParameters()
 
     auto stream_names_desc = rcl_interfaces::msg::ParameterDescriptor{};
     stream_names_desc.description =
-      "Optional string list of names that are to be "
-      "associated with each stream. If multiple steams are available "
-      "but no names are given, each stream will get given a name "
-      "based on its ID, starting with 0.";
+      "String list of names that are to be associated with each stream. "
+      "If multiple streams are available, these names will be appended "
+      "to the topic names in order to distinguish the different image "
+      "streams. If omitted or less names are given than streams available, "
+      "each stream will get given a name based on its ID, starting with 0.";
     declare_parameter<std::vector<std::string>>("stream_names", std::vector<std::string>({}),
                                                 stream_names_desc);
 
     auto camera_info_urls_desc = rcl_interfaces::msg::ParameterDescriptor{};
     camera_info_urls_desc.description =
       "String list of urls to camera_info files associated with "
-      "each stream. List must have the same length as "
-      "'pixel_formats'. If both lists have different lengths, "
-      "they are truncated to the size of the shorter one.";
+      "each stream. List should have the same length as the number "
+      "of streams provided by the camera. If the number of URLs does "
+      "not correspond to number of streams available, the minimum of "
+      "both is used to set the number of streams that are to be established. "
+      "If omitted, it is constructed from the camera GUID located within the "
+      "current working directory, with the stream name separated by '_' appended "
+      "to the file name, if more than one streams are instantiated.";
     declare_parameter<std::vector<std::string>>("camera_info_urls", std::vector<std::string>({}),
                                                 camera_info_urls_desc);
 
@@ -181,7 +186,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 {
     //--- get number of streams and associated names
 
-    int num_streams       = discoverNumberOfStreams();
+    int num_streams = discoverNumberOfStreams();
+
     auto stream_names     = get_parameter("stream_names").as_string_array();
     auto camera_info_urls = get_parameter("camera_info_urls").as_string_array();
     auto base_frame_id    = get_parameter("frame_id").as_string();
@@ -479,15 +485,6 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                 setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
         }
 
-        //--- Exposure Auto
-        tmp_feature_name = "ExposureAuto";
-        if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
-            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
-
-        std::string exposure_auto_str;
-        getFeatureValue<std::string>(tmp_feature_name, exposure_auto_str);
-        ArvAuto exposure_auto = arv_auto_from_string(exposure_auto_str.c_str());
-
         //--- Exposure Mode
         tmp_feature_name = "ExposureMode";
         if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
@@ -496,6 +493,15 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         std::string exposure_mode_str;
         getFeatureValue<std::string>(tmp_feature_name, exposure_mode_str);
         ArvExposureMode exposure_mode = arv_exposure_mode_from_string(exposure_mode_str.c_str());
+
+        //--- Exposure Auto
+        tmp_feature_name = "ExposureAuto";
+        if (getAcquisitionControlParameter(tmp_feature_name, tmp_param_value))
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+
+        std::string exposure_auto_str;
+        getFeatureValue<std::string>(tmp_feature_name, exposure_auto_str);
+        ArvAuto exposure_auto = arv_auto_from_string(exposure_auto_str.c_str());
 
         //--- Exposure Time
         if (exposure_auto == ARV_AUTO_OFF && exposure_mode == ARV_EXPOSURE_MODE_TIMED)
