@@ -58,7 +58,7 @@ def generate_launch_description():
                     "camera_info_urls": ["file://" + os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example.yaml')],
-                    
+
                     # GenICam-specific parameters
                     "ImageFormatControl": {
                         "PixelFormat": "BayerRG8",

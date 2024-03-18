@@ -152,7 +152,7 @@ To extract this XML data and write it into a file, camera_aravis2 provides the n
 ros2 run camera_aravis2 camera_xml_exporter --ros-args -p guid:=<camera_guid> -p xml_file:=<output_file>
 ```
 
-If `guid` is omitted, the XML data will be read from any of the cameras which are connected and found by camera_aravis.
+If `guid` is omitted, the XML data will be read from any of the cameras which are connected and found by camera_aravis2.
 As a `xml_file`, either a relative or absolute path can be provided in which the XML data is to be saved.
 If omitted, the data is saved into a file in the current working directory with the 'guid' as filename.
 
