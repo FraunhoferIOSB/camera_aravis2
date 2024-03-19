@@ -50,10 +50,27 @@
         success &= true;                    \
     }
 
+/// Macro to assert success and log GError if necessary with custommesage
+#define ASSERT_GERROR_MSG(err, logger, custom_msg, success) \
+    if (err)                                                \
+    {                                                       \
+        success &= false;                                   \
+        err.log(logger, custom_msg);                        \
+    }                                                       \
+    else                                                    \
+    {                                                       \
+        success &= true;                                    \
+    }
+
 /// Macro to check if error occurred and log if necessary
 #define CHECK_GERROR(err, logger) \
     if (err)                      \
         err.log(logger);
+
+/// Macro to check if error occurred and log if necessary with costom message
+#define CHECK_GERROR_MSG(err, logger, custom_msg) \
+    if (err)                                      \
+        err.log(logger, custom_msg);
 
 namespace camera_aravis2
 {
@@ -74,7 +91,8 @@ class GuardedGError
 
     operator bool() const;
 
-    void log(const rclcpp::Logger& logger) const;
+    void log(const rclcpp::Logger& logger,
+             const std::string& custom_msg = "") const;
 
     //--- MEMBER DECLARATION ---//
 

@@ -67,13 +67,14 @@ GuardedGError::operator bool() const
 }
 
 //==================================================================================================
-void GuardedGError::log(const rclcpp::Logger& logger) const
+void GuardedGError::log(const rclcpp::Logger& logger,
+                        const std::string& custom_msg) const
 {
     if (err == nullptr)
         return;
 
-    RCLCPP_ERROR(logger, "[%s] Code %i: %s",
-                 g_quark_to_string(err->domain), err->code, err->message);
+    RCLCPP_ERROR(logger, "[%s] Code %i: %s. %s",
+                 g_quark_to_string(err->domain), err->code, err->message, custom_msg.c_str());
 }
 
 }  // namespace camera_aravis2

@@ -172,9 +172,6 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
     //--- check if feature is available
     if (!arv_device_is_feature_available(p_device_, feature_name.c_str(), err.ref()))
     {
-        RCLCPP_WARN(logger_, "Feature '%s' is not available. Value will not be set.",
-                    feature_name.c_str());
-        ASSERT_GERROR(err, logger_, is_successful);
         return false;
     }
 
@@ -201,12 +198,12 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
     }
     else
     {
-        RCLCPP_WARN(logger_, "Setting feature of type '%s' is currently not supported. "
-                             "Value will not be set.",
+        RCLCPP_WARN(logger_, "Getting feature of type '%s' is currently not supported.",
                     typeid(T).name());
     }
 
-    ASSERT_GERROR(err, logger_, is_successful);
+    ASSERT_GERROR_MSG(err, logger_,
+                      "In getting value for feature '" + feature_name + "'.", is_successful);
 
     return is_successful;
 }
@@ -270,7 +267,8 @@ bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, cons
                     typeid(T).name());
     }
 
-    ASSERT_GERROR(err, logger_, is_successful);
+    ASSERT_GERROR_MSG(err, logger_,
+                      "In setting value for feature '" + feature_name + "'.", is_successful);
 
     return is_successful;
 }

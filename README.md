@@ -124,7 +124,7 @@ To find the features that are available for configuration on the camera, togethe
 
 ### Example Launch Files
 
-- ```camera_driver_gv```: [camera_aravis2/launch/camera_driver_gv_example.launch.py](./camera_aravis2/camera_aravis2/launch/camera_driver_gv_example.launch.py)
+- ```camera_driver_gv```: [camera_aravis2/launch/camera_driver_gv_example.launch.py](./camera_aravis2/launch/camera_driver_gv_example.launch.py)
 
 ## Finding Available Cameras
 
@@ -156,7 +156,7 @@ If `guid` is omitted, the XML data will be read from any of the cameras which ar
 As a `xml_file`, either a relative or absolute path can be provided in which the XML data is to be saved.
 If omitted, the data is saved into a file in the current working directory with the 'guid' as filename.
 
-Example launch file: [camera_aravis2/launch/camera_xml_exporter_example.launch.pycamera_xml_exporter_example.launch.py](./camera_aravis2/launch/camera_xml_exporter_example.launch.py).
+Example launch file: [camera_aravis2/launch/camera_xml_exporter_example.launch.py](./camera_aravis2/launch/camera_xml_exporter_example.launch.py).
 
 
 Alternatively, you can use `aravis-tools` to see the feature list and the XML file: 

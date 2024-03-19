@@ -52,27 +52,27 @@ def generate_launch_description():
         parameters=[
                 {
                     # Driver-specific parameters
-                    "guid": "Allied Vision-Alvium G1-240c-05P3C",
+                    "guid": "JAI Corporation-FS-3200D-10GE-U320478",
                     "frame_id": "camera_gv",
-                    "stream_names": ["vis"],
+                    "stream_names": ["vis", "nir"],
                     "camera_info_urls": ["file://" + os.path.join(
+                        get_package_share_directory('camera_aravis2'),
+                        'config/camera_info_example.yaml'), "file://" + os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example.yaml')],
                     "verbose": True,
 
                     # GenICam-specific parameters
                     "ImageFormatControl": {
-                        "PixelFormat": "BayerRG8",
+                        "PixelFormat": ["BayerRG8", "Mono8"],
                         "Width": 1920,
                         "Height": 1200,
-                        "OffsetX": 8,
-                        "OffsetY": 8,
                     },
                     "AcquisitionControl": {
                         "ExposureTime": 10000.0,
                         "ExposureAuto": "Off",
                         "ExposureMode": "Timed",
-                        "AcquisitionFrameRate": 30.0
+                        "AcquisitionFrameRate": [30.0, 5.0]
                     }
                 }
             ]
