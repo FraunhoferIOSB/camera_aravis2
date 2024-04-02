@@ -50,6 +50,7 @@ extern "C"
 // camera_aravis2
 #include "camera_aravis2/camera_aravis_node_base.h"
 #include "camera_aravis2/concurrent_queue.hpp"
+#include "camera_aravis2/config_structs.h"
 #include "camera_aravis2/conversion_utils.h"
 #include "camera_aravis2/image_buffer_pool.h"
 
@@ -58,63 +59,6 @@ namespace camera_aravis2
 class CameraDriverGv : public CameraAravisNodeBase
 {
     //--- STRUCT DECLARATION ---//
-
-    /**
-     * @brief Struct representing sensor
-     */
-    struct Sensor
-    {
-        /// Frame ID associated with the sensor.
-        std::string frame_id = "";
-
-        /// Width of the sensor in pixel.
-        int32_t width = 0;
-
-        /// Height of the sensor in pixel.
-        int32_t height = 0;
-
-        /// Pixel format associated ith the sensor.
-        std::string pixel_format = "";
-
-        /// Number of pixel associated with the pixel format.
-        size_t n_bits_pixel = 0;
-
-        /// Flip the image horizontally on the device.
-        bool reverse_x = false;
-
-        /// Flip the image vertically on the device.
-        bool reverse_y = false;
-    };
-
-    /**
-     * @brief Struct representing region of interest corresponding to image.
-     */
-    struct ImageRoi
-    {
-        /// Offset in x direction.
-        int x = 0;
-
-        /// Offset in y direction.
-        int y = 0;
-
-        /// Width of image.
-        int width = 0;
-
-        /// Minimum width of image.
-        int width_min = 0;
-
-        /// Maximum width of image.
-        int width_max = 0;
-
-        /// Height of image.
-        int height = 0;
-
-        /// Minimum height of image.
-        int height_min = 0;
-
-        /// Maximum height of image.
-        int height_max = 0;
-    };
 
     /**
      * @brief Struct implementing camera stream.
@@ -129,6 +73,8 @@ class CameraDriverGv : public CameraAravisNodeBase
           p_buffer_pool(ImageBufferPool::SharedPtr()),
           name(""),
           sensor(Sensor()),
+          image_roi(ImageRoi()),
+          camera_info_url(""),
           p_camera_info_manager(nullptr),
           p_cam_info_msg(nullptr),
           is_buffer_processed(false)
@@ -149,6 +95,9 @@ class CameraDriverGv : public CameraAravisNodeBase
 
         /// Image region associated with the stream.
         ImageRoi image_roi;
+
+        /// Control settings for image acquisition.
+        AcquisitionControl acquisition_control;
 
         /// URL to camera info yaml file.
         std::string camera_info_url;
@@ -226,7 +175,7 @@ class CameraDriverGv : public CameraAravisNodeBase
      */
     [[nodiscard]] inline bool getImageFormatControlParameter(
       const std::string& param_name,
-      rclcpp::ParameterValue& param_value);
+      rclcpp::ParameterValue& param_value) const;
 
     /**
      * @brief Set image format control settings of the camera.
@@ -249,7 +198,7 @@ class CameraDriverGv : public CameraAravisNodeBase
      */
     [[nodiscard]] inline bool getAcquisitionControlParameter(
       const std::string& param_name,
-      rclcpp::ParameterValue& param_value);
+      rclcpp::ParameterValue& param_value) const;
 
     /**
      * @brief Set acquisition control settings of the camera.
@@ -314,6 +263,11 @@ class CameraDriverGv : public CameraAravisNodeBase
                            const sensor_msgs::msg::Image::SharedPtr& p_img_msg) const;
 
     /**
+     * @brief Print currently applied camera configuration.
+     */
+    void printCameraConfiguration() const;
+
+    /**
      * @brief Print stream statistics, such as completed and failed buffers.
      */
     void printStreamStatistics() const;
@@ -344,8 +298,14 @@ class CameraDriverGv : public CameraAravisNodeBase
     /// List of pointers to data tuples for the new-buffer callback.
     std::vector<std::shared_ptr<std::tuple<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;
 
+    /// Flag indicating verbose output.
+    bool is_verbose_enable_;
+
     /// Flag indicating to use PTP timestamp.
     bool use_ptp_timestamp_;
+
+    /// Message strings to warn the user of inconsistencies at summary output.
+    std::vector<std::string> config_warn_msgs_;
 };
 
 }  // namespace camera_aravis2

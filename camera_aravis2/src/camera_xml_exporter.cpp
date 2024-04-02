@@ -26,7 +26,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "../include/camera_aravis2/camera_xml_exporter.h"
+#include "camera_aravis2/camera_xml_exporter.h"
 
 // Std
 #include <chrono>
@@ -35,8 +35,7 @@
 #include <thread>
 
 // camera_aravis2
-#include "../include/camera_aravis2/common.h"
-#include "../include/camera_aravis2/error.h"
+#include "camera_aravis2/error.h"
 
 namespace camera_aravis2
 {

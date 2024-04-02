@@ -30,7 +30,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 // camera_aravis2
-#include "../include/camera_aravis2/camera_xml_exporter.h"
+#include "camera_aravis2/camera_xml_exporter.h"
 
 int main(int argc, char** argv)
 {

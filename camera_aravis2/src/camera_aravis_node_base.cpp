@@ -26,14 +26,13 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "../include/camera_aravis2/camera_aravis_node_base.h"
+#include "camera_aravis2/camera_aravis_node_base.h"
 
 // Std
 #include <type_traits>
 
 // camera_aravis2
-#include "../include/camera_aravis2/common.h"
-#include "../include/camera_aravis2/error.h"
+#include "camera_aravis2/error.h"
 
 namespace camera_aravis2
 {
@@ -84,7 +83,7 @@ bool CameraAravisNodeBase::isInitialized() const
     RCLCPP_INFO(logger_, "Attached cameras (Num. Interfaces: %d | Num. Devices: %d):",
                 n_interfaces, n_devices);
     for (uint i = 0; i < n_devices; i++)
-        RCLCPP_INFO(logger_, "\tDevice %d: %s (%s)", i,
+        RCLCPP_INFO(logger_, "  Device %d: %s (%s)", i,
                     arv_get_device_id(i),
                     arv_get_device_address(i));
 
@@ -172,9 +171,6 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
     //--- check if feature is available
     if (!arv_device_is_feature_available(p_device_, feature_name.c_str(), err.ref()))
     {
-        RCLCPP_WARN(logger_, "Feature '%s' is not available. Value will not be set.",
-                    feature_name.c_str());
-        ASSERT_GERROR(err, logger_, is_successful);
         return false;
     }
 
@@ -201,12 +197,12 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
     }
     else
     {
-        RCLCPP_WARN(logger_, "Setting feature of type '%s' is currently not supported. "
-                             "Value will not be set.",
+        RCLCPP_WARN(logger_, "Getting feature of type '%s' is currently not supported.",
                     typeid(T).name());
     }
 
-    ASSERT_GERROR(err, logger_, is_successful);
+    ASSERT_GERROR_MSG(err, logger_,
+                      "In getting value for feature '" + feature_name + "'.", is_successful);
 
     return is_successful;
 }
@@ -270,7 +266,8 @@ bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, cons
                     typeid(T).name());
     }
 
-    ASSERT_GERROR(err, logger_, is_successful);
+    ASSERT_GERROR_MSG(err, logger_,
+                      "In setting value for feature '" + feature_name + "'.", is_successful);
 
     return is_successful;
 }
@@ -339,25 +336,34 @@ bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
 {
     T bounded_value;
 
-    // TODO: Catch rclcpp::ParameterTypeException and print feature name
-
-    //--- check if single parameter of parameter array
-    //--- BYTE_ARRAY is the first 'array' type in the list
-    if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+    try
     {
-        bounded_value = std::max(min, std::min(parameter_value.get<T>(), max));
+        //--- check if single parameter of parameter array
+        //--- BYTE_ARRAY is the first 'array' type in the list
+        if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+        {
+            bounded_value = std::max(min, std::min(parameter_value.get<T>(), max));
+        }
+        else
+        {
+            // List of values that are to be set. If the list is smaller than the number of streams
+            // the last value of the is used for the remaining streams.
+            std::vector<T> value_list = parameter_value.get<std::vector<T>>();
+
+            if (value_list.empty())
+                return false;
+
+            T unbounded_value = value_list.at(std::min(idx,
+                                                       static_cast<uint>(value_list.size() - 1)));
+            bounded_value     = std::max(min, std::min(unbounded_value, max));
+        }
     }
-    else
+    catch (const rclcpp::ParameterTypeException& e)
     {
-        // List of values that are to be set. If the list is smaller than the number of streams
-        // the last value of the is used for the remaining streams.
-        std::vector<T> value_list = parameter_value.get<std::vector<T>>();
-
-        if (value_list.empty())
-            return false;
-
-        T unbounded_value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
-        bounded_value     = std::max(min, std::min(unbounded_value, max));
+        RCLCPP_ERROR(logger_, "Exception while trying to set value for '%s'. "
+                              "Reason: %s",
+                     feature_name.c_str(), e.what());
+        return false;
     }
 
     return setFeatureValue<T>(feature_name, bounded_value);
@@ -374,6 +380,52 @@ template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<int64_t>
 template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<double>(
   const std::string&, const double&, const double&,
   const rclcpp::ParameterValue&, const uint&) const;
+
+//==================================================================================================
+template <typename T>
+bool CameraAravisNodeBase::isParameterValueEqualTo(const rclcpp::ParameterValue& parameter_value,
+                                                   const T& test_value,
+                                                   const uint& idx) const
+{
+    T value;
+
+    try
+    {
+        //--- check if single parameter of parameter array
+        //--- BYTE_ARRAY is the first 'array' type in the list
+        if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+        {
+            value = parameter_value.get<T>();
+        }
+        else
+        {
+            // List of values that are to be set. If the list is smaller than the number of streams
+            // the last value of the is used for the remaining streams.
+            std::vector<T> value_list = parameter_value.get<std::vector<T>>();
+
+            if (value_list.empty())
+                return false;
+
+            value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
+        }
+    }
+    catch (const rclcpp::ParameterTypeException& e)
+    {
+        RCLCPP_ERROR_STREAM(logger_, "Exception while trying to compare parameter value to '"
+                                       << test_value << "'. Reason: " << e.what());
+        return false;
+    }
+
+    return (value == test_value);
+}
+template bool CameraAravisNodeBase::isParameterValueEqualTo<bool>(
+  const rclcpp::ParameterValue&, const bool&, const uint&) const;
+template bool CameraAravisNodeBase::isParameterValueEqualTo<std::string>(
+  const rclcpp::ParameterValue&, const std::string&, const uint&) const;
+template bool CameraAravisNodeBase::isParameterValueEqualTo<int64_t>(
+  const rclcpp::ParameterValue&, const int64_t&, const uint&) const;
+template bool CameraAravisNodeBase::isParameterValueEqualTo<double>(
+  const rclcpp::ParameterValue&, const double&, const uint&) const;
 
 //==================================================================================================
 std::string CameraAravisNodeBase::constructCameraGuidStr(ArvCamera* p_cam)
@@ -399,7 +451,7 @@ void CameraAravisNodeBase::handleControlLostSignal(ArvDevice* p_device, gpointer
         return;
 
     RCLCPP_FATAL(p_ca_instance->logger_, "Control to aravis device lost.");
-    RCLCPP_FATAL(p_ca_instance->logger_, "\tGUID: %s", p_ca_instance->guid_.c_str());
+    RCLCPP_FATAL(p_ca_instance->logger_, "  GUID: %s", p_ca_instance->guid_.c_str());
 
     rclcpp::shutdown();
 }

@@ -26,7 +26,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "../include/camera_aravis2/image_buffer_pool.h"
+#include "camera_aravis2/image_buffer_pool.h"
 
 // Std
 #include <functional>

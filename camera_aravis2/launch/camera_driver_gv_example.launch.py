@@ -58,14 +58,13 @@ def generate_launch_description():
                     "camera_info_urls": ["file://" + os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example.yaml')],
-                    
+                    "verbose": False,
+
                     # GenICam-specific parameters
                     "ImageFormatControl": {
-                        "PixelFormat": "BayerRG8",
+                        "PixelFormat": ["BayerRG8", "Mono8"],
                         "Width": 1920,
                         "Height": 1200,
-                        "OffsetX": 8,
-                        "OffsetY": 8,
                     },
                     "AcquisitionControl": {
                         "ExposureTime": 10000.0,

@@ -45,6 +45,20 @@ extern "C"
 // camera_aravis2
 #include "camera_aravis2/error.h"
 
+// Macro to assert success of given function
+#define ASSERT_SUCCESS(fn) \
+    if (!fn)               \
+    {                      \
+        return;            \
+    }
+// Macro to assert success of given function and shut down if not successful
+#define ASSERT_SUCCESS_AND_SHUTDOWN(fn) \
+    if (!fn)                            \
+    {                                   \
+        rclcpp::shutdown();             \
+        return;                         \
+    }
+
 namespace camera_aravis2
 {
 
@@ -155,6 +169,21 @@ class CameraAravisNodeBase : public rclcpp::Node
                                              const T& min, const T& max,
                                              const rclcpp::ParameterValue& parameter_value,
                                              const uint& idx = 0) const;
+
+    /**
+     * @brief Check if parameter value is equal to given test value.
+     *
+     * @tparam T Type of test value.
+     * @param[in] parameter_value Specified parameter values.
+     * @param[in] test_value Test value at which the parameter value is to be checked against.
+     * @param[in] idx Index of parameter value that is to be set. Only used if parameter values are
+     * given as array.
+     * @return Returns true if equal, false otherwise.
+     */
+    template <typename T>
+    bool isParameterValueEqualTo(const rclcpp::ParameterValue& parameter_value,
+                                 const T& test_value,
+                                 const uint& idx = 0) const;
 
     //--- FUNCTION DECLARATION ---//
 
