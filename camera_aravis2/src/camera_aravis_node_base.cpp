@@ -337,25 +337,34 @@ bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
 {
     T bounded_value;
 
-    // TODO: Catch rclcpp::ParameterTypeException and print feature name
-
-    //--- check if single parameter of parameter array
-    //--- BYTE_ARRAY is the first 'array' type in the list
-    if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+    try
     {
-        bounded_value = std::max(min, std::min(parameter_value.get<T>(), max));
+
+        //--- check if single parameter of parameter array
+        //--- BYTE_ARRAY is the first 'array' type in the list
+        if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+        {
+            bounded_value = std::max(min, std::min(parameter_value.get<T>(), max));
+        }
+        else
+        {
+            // List of values that are to be set. If the list is smaller than the number of streams
+            // the last value of the is used for the remaining streams.
+            std::vector<T> value_list = parameter_value.get<std::vector<T>>();
+
+            if (value_list.empty())
+                return false;
+
+            T unbounded_value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
+            bounded_value     = std::max(min, std::min(unbounded_value, max));
+        }
     }
-    else
+    catch (const rclcpp::ParameterTypeException& e)
     {
-        // List of values that are to be set. If the list is smaller than the number of streams
-        // the last value of the is used for the remaining streams.
-        std::vector<T> value_list = parameter_value.get<std::vector<T>>();
-
-        if (value_list.empty())
-            return false;
-
-        T unbounded_value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
-        bounded_value     = std::max(min, std::min(unbounded_value, max));
+        RCLCPP_ERROR(logger_, "Exception while trying to set value for '%s'. "
+                              "Reason: %s",
+                     feature_name.c_str(), e.what());
+        return false;
     }
 
     return setFeatureValue<T>(feature_name, bounded_value);
@@ -372,6 +381,52 @@ template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<int64_t>
 template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<double>(
   const std::string&, const double&, const double&,
   const rclcpp::ParameterValue&, const uint&) const;
+
+//==================================================================================================
+template <typename T>
+bool CameraAravisNodeBase::isParameterValueEqualTo(const rclcpp::ParameterValue& parameter_value,
+                                                   const T& test_value,
+                                                   const uint& idx) const
+{
+    T value;
+
+    try
+    {
+        //--- check if single parameter of parameter array
+        //--- BYTE_ARRAY is the first 'array' type in the list
+        if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+        {
+            value = parameter_value.get<T>();
+        }
+        else
+        {
+            // List of values that are to be set. If the list is smaller than the number of streams
+            // the last value of the is used for the remaining streams.
+            std::vector<T> value_list = parameter_value.get<std::vector<T>>();
+
+            if (value_list.empty())
+                return false;
+
+            value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
+        }
+    }
+    catch (const rclcpp::ParameterTypeException& e)
+    {
+        RCLCPP_ERROR_STREAM(logger_, "Exception while trying to compare parameter value to '"
+                                       << test_value << "'. Reason: " << e.what());
+        return false;
+    }
+
+    return (value == test_value);
+}
+template bool CameraAravisNodeBase::isParameterValueEqualTo<bool>(
+  const rclcpp::ParameterValue&, const bool&, const uint&) const;
+template bool CameraAravisNodeBase::isParameterValueEqualTo<std::string>(
+  const rclcpp::ParameterValue&, const std::string&, const uint&) const;
+template bool CameraAravisNodeBase::isParameterValueEqualTo<int64_t>(
+  const rclcpp::ParameterValue&, const int64_t&, const uint&) const;
+template bool CameraAravisNodeBase::isParameterValueEqualTo<double>(
+  const rclcpp::ParameterValue&, const double&, const uint&) const;
 
 //==================================================================================================
 std::string CameraAravisNodeBase::constructCameraGuidStr(ArvCamera* p_cam)

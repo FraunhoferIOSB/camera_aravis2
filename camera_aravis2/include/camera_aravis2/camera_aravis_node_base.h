@@ -156,6 +156,21 @@ class CameraAravisNodeBase : public rclcpp::Node
                                              const rclcpp::ParameterValue& parameter_value,
                                              const uint& idx = 0) const;
 
+    /**
+     * @brief Check if parameter value is equal to given test value.
+     *
+     * @tparam T Type of test value.
+     * @param[in] parameter_value Specified parameter values.
+     * @param[in] test_value Test value at which the parameter value is to be checked against.
+     * @param[in] idx Index of parameter value that is to be set. Only used if parameter values are
+     * given as array.
+     * @return Returns true if equal, false otherwise.
+     */
+    template <typename T>
+    bool isParameterValueEqualTo(const rclcpp::ParameterValue& parameter_value,
+                                 const T& test_value,
+                                 const uint& idx = 0) const;
+
     //--- FUNCTION DECLARATION ---//
 
   protected:
