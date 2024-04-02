@@ -1,7 +1,7 @@
 # This config uses industrial_ci (https://github.com/ros-industrial/industrial_ci.git).
 # For troubleshooting, see README (https://github.com/ros-industrial/industrial_ci/blob/master/README.rst)
 
-name: Build & Test
+name: Iron Irwini
 
 on: # this determines when this workflow is run
   push:
@@ -11,34 +11,8 @@ on: # this determines when this workflow is run
   workflow_dispatch: # allow manually starting this workflow
 
 jobs:
-  humble:
-    name: Humble Hawksbill
-    runs-on: ubuntu-latest
-    strategy:
-      # fail-fast: false # uncomment if failing jobs should not cancel the others immediately
-      matrix: # matrix is the product of entries
-        ROS_DISTRO: [humble]
-        ROS_REPO: [main]
-    env:
-      ADDITIONAL_DEBS: "libaravis-dev" # List the name of DEB(s delimitted by whitespace if multiple DEBs specified). Needs to be full-qualified Ubuntu package name.
-      CCACHE_DIR: "${{ github.workspace }}/.ccache" # directory for ccache (and how we enable ccache in industrial_ci)
-    steps:
-      - uses: actions/checkout@v3 # clone target repository
-      - uses: actions/cache@v2 # fetch/store the directory used by ccache before/after the ci run
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          # This configuration will always create a new ccache cache starting off from the previous one (if any).
-          # In this simple version it will be shared between all builds of the same ROS_REPO and ROS_REPO
-          # and might need some fine-tuning to match the use case
-          key: ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-${{github.run_id}}
-          restore-keys: |
-            ccache-${{ matrix.ROS_DISTRO }}-${{ matrix.ROS_REPO }}-
-      - uses: 'ros-industrial/industrial_ci@master' # run industrial_ci
-        env: # either pass all entries explicitly
-          ROS_DISTRO: ${{ matrix.ROS_DISTRO }}
-          ROS_REPO: ${{ matrix.ROS_REPO }}
-  iron:
-    name: Iron Irwini
+  build_and_test:
+    name: Build & Test
     runs-on: ubuntu-latest
     strategy:
       # fail-fast: false # uncomment if failing jobs should not cancel the others immediately
