@@ -700,7 +700,7 @@ void CameraDriverGv::spawnCameraStreams()
         Stream& stream = streams_[i];
 
         RCLCPP_INFO(logger_, "Spawning camera stream with ID %i (%s)", i,
-                    stream.sensor.frame_id.c_str());
+                    stream.name.c_str());
 
         const int MAX_RETRIES = 60;
         int tryCount          = 1;
@@ -736,7 +736,7 @@ void CameraDriverGv::spawnCameraStreams()
             {
                 RCLCPP_WARN(logger_, "%s: Could not create image stream with ID %i (%s). "
                                      "Retrying (%i/%i) ...",
-                            guid_.c_str(), i, stream.sensor.frame_id.c_str(),
+                            guid_.c_str(), i, stream.name.c_str(),
                             tryCount, MAX_RETRIES);
                 rclcpp::sleep_for(std::chrono::seconds(1));
                 tryCount++;
@@ -746,7 +746,7 @@ void CameraDriverGv::spawnCameraStreams()
         //--- check if stream could be established
         if (!stream.p_arv_stream)
             RCLCPP_ERROR(logger_, "%s: Could not create image stream with ID %i (%s).",
-                         guid_.c_str(), i, stream.sensor.frame_id.c_str());
+                         guid_.c_str(), i, stream.name.c_str());
     }
     is_spawning_ = false;
 
@@ -833,7 +833,7 @@ void CameraDriverGv::processStreamBuffer(const uint stream_id)
     Stream& stream = streams_[stream_id];
 
     RCLCPP_INFO(logger_, "Started processing thread for stream %i (%s)", stream_id,
-                stream.sensor.frame_id.c_str());
+                stream.name.c_str());
 
     while (stream.is_buffer_processed)
     {
@@ -878,7 +878,7 @@ void CameraDriverGv::processStreamBuffer(const uint stream_id)
     }
 
     RCLCPP_INFO(logger_, "Finished processing thread for stream %i (%s)", stream_id,
-                stream.sensor.frame_id.c_str());
+                stream.name.c_str());
 }
 
 //==================================================================================================
@@ -1068,7 +1068,7 @@ void CameraDriverGv::printStreamStatistics() const
         arv_stream_get_statistics(STREAM.p_arv_stream,
                                   &n_completed_buffers, &n_failures, &n_underruns);
 
-        RCLCPP_INFO(logger_, "Statistics for stream %i (%s):", i, STREAM.sensor.frame_id.c_str());
+        RCLCPP_INFO(logger_, "Statistics for stream %i (%s):", i, STREAM.name.c_str());
         RCLCPP_INFO(logger_, "  Completed buffers = %li", (uint64_t)n_completed_buffers);
         RCLCPP_INFO(logger_, "  Failures          = %li", (uint64_t)n_failures);
         RCLCPP_INFO(logger_, "  Underruns         = %li", (uint64_t)n_underruns);

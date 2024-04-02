@@ -70,6 +70,7 @@ def generate_launch_description():
                         "ExposureTime": 10000.0,
                         "ExposureAuto": "Off",
                         "ExposureMode": "Timed",
+                        "AcquisitionFrameRateEnable": True,
                         "AcquisitionFrameRate": 30.0
                     }
                 }
