@@ -45,6 +45,20 @@ extern "C"
 // camera_aravis2
 #include "camera_aravis2/error.h"
 
+// Macro to assert success of given function
+#define ASSERT_SUCCESS(fn) \
+    if (!fn)               \
+    {                      \
+        return;            \
+    }
+// Macro to assert success of given function and shut down if not successful
+#define ASSERT_SUCCESS_AND_SHUTDOWN(fn) \
+    if (!fn)                            \
+    {                                   \
+        rclcpp::shutdown();             \
+        return;                         \
+    }
+
 namespace camera_aravis2
 {
 

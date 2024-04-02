@@ -28,9 +28,6 @@
 
 #include "camera_aravis2/camera_driver_uv.h"
 
-// camera_aravis2
-#include "camera_aravis2/common.h"
-
 namespace camera_aravis2
 {
 

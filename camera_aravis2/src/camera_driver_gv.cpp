@@ -34,7 +34,6 @@
 #include <thread>
 
 // camera_aravis2
-#include "camera_aravis2/common.h"
 #include "camera_aravis2/conversion_utils.h"
 #include "camera_aravis2/error.h"
 

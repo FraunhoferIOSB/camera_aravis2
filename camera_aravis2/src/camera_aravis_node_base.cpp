@@ -32,7 +32,6 @@
 #include <type_traits>
 
 // camera_aravis2
-#include "camera_aravis2/common.h"
 #include "camera_aravis2/error.h"
 
 namespace camera_aravis2
