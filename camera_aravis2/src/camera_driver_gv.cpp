@@ -26,7 +26,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "../include/camera_aravis2/camera_driver_gv.h"
+#include "camera_aravis2/camera_driver_gv.h"
 
 // Std
 #include <chrono>
@@ -34,9 +34,9 @@
 #include <thread>
 
 // camera_aravis2
-#include "../include/camera_aravis2/common.h"
-#include "../include/camera_aravis2/conversion_utils.h"
-#include "../include/camera_aravis2/error.h"
+#include "camera_aravis2/common.h"
+#include "camera_aravis2/conversion_utils.h"
+#include "camera_aravis2/error.h"
 
 // Conversions from integers to Arv types.
 static const char* arvBufferStatusFromInt[] =

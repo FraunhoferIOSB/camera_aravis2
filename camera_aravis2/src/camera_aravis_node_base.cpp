@@ -26,14 +26,14 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "../include/camera_aravis2/camera_aravis_node_base.h"
+#include "camera_aravis2/camera_aravis_node_base.h"
 
 // Std
 #include <type_traits>
 
 // camera_aravis2
-#include "../include/camera_aravis2/common.h"
-#include "../include/camera_aravis2/error.h"
+#include "camera_aravis2/common.h"
+#include "camera_aravis2/error.h"
 
 namespace camera_aravis2
 {

@@ -26,10 +26,10 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "../include/camera_aravis2/camera_driver_uv.h"
+#include "camera_aravis2/camera_driver_uv.h"
 
 // camera_aravis2
-#include "../include/camera_aravis2/common.h"
+#include "camera_aravis2/common.h"
 
 namespace camera_aravis2
 {
