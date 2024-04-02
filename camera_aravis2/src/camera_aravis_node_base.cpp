@@ -339,7 +339,6 @@ bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
 
     try
     {
-
         //--- check if single parameter of parameter array
         //--- BYTE_ARRAY is the first 'array' type in the list
         if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
@@ -355,7 +354,8 @@ bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
             if (value_list.empty())
                 return false;
 
-            T unbounded_value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
+            T unbounded_value = value_list.at(std::min(idx,
+                                                       static_cast<uint>(value_list.size() - 1)));
             bounded_value     = std::max(min, std::min(unbounded_value, max));
         }
     }
