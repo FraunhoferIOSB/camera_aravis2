@@ -7,7 +7,6 @@ It is open sourced under the 3-clause BSD license.
 It relies on the [Aravis](http://live.gnome.org/Aravis) library to access the GigEVision and USB3Vision cameras. 
 Aravis is a glib/gobject based library for video acquisition using GenICam cameras. 
 It currently implements the gigabit ethernet and USB3 protocols used by industrial cameras.
-It is licensed under LGPLv2+.
 
 ------------------------
 
@@ -15,7 +14,7 @@ It is licensed under LGPLv2+.
 
 | Service    | devel  | main |
 | ---------- | ------- | ------ |
-| GitHub     | [![Iron Irwini](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test.yml/badge.svg?branch=devel)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test.yml)    | [![Iron Irwini](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test.yml/badge.svg?branch=main)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test.yml) |
+| GitHub     | [![Humble Hawksbill](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml/badge.svg?branch=devel)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml)<br>[![Iron Irwini](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml/badge.svg?branch=devel)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml) | [![Humble Hawksbill](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml/badge.svg?branch=main)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml)<br>[![Iron Irwini](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml/badge.svg?branch=main)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml) |
 
 ------------------------
 
@@ -174,7 +173,7 @@ arv-tool-0.8 --name=<camera_guid> genicam
 **camera_aravis2**:
 
 - Aravis 0.8 or later
-- ROS 2
+- ROS 2 (tested with [humble and later](#continuous-integration))
 - cv_bridge
 - image_transport
 - camera_info_manager
@@ -184,7 +183,7 @@ arv-tool-0.8 --name=<camera_guid> genicam
 
 **camera_aravis2_msgs**:
 
-- ROS 2
+- ROS 2 (tested with [humble and later](#continuous-integration))
 - std_msgs
 - sensor_msgs
 

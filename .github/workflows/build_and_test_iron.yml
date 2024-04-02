@@ -12,7 +12,7 @@ on: # this determines when this workflow is run
 
 jobs:
   build_and_test:
-    name: ROS ${{ matrix.ROS_DISTRO }} (${{ matrix.ROS_REPO }})
+    name: Build & Test
     runs-on: ubuntu-latest
     strategy:
       # fail-fast: false # uncomment if failing jobs should not cancel the others immediately
