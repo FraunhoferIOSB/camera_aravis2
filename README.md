@@ -73,21 +73,25 @@ If specified as launch parameter, camera_aravis2 will set the following features
     - `PixelFormat` (String): Format of the pixels provided by the device
     - `ReverseX` (Bool): Flip horizontally the image sent by the device.
     - `ReverseY` (Bool): Flip vertically the image sent by the device.
+    - `BinningHorizontal` (Int): Number of pixels to horizontally combine together.
+    - `BinningHorizontalMode` (String): Mode to use when BinningHorizontal is used. Values possible: 'Sum', or 'Average'.
+    - `BinningVertical` (Int): Number of pixels to horizontally combine together.
+    - `BinningVerticalMode` (String): Mode to use when BinningHorizontal is used. Values possible: 'Sum', or 'Average'.
     - `Width` (Int): Width of the image provided by the device (in pixels).
     - `Height` (Int): Height of the image provided by the device (in pixels).
     - `OffsetX` (Int): Horizontal offset from the origin to the region of interest (in pixels).
     - `OffsetY` (Int): Vertical offset from the origin to the region of interest (in pixels).
 - `AcquisitionControl`
-    - `AcquisitionMode` (String): Sets the acquisition mode of the device. Values possible: 'SingleFrame', 'MultiFrame', or 'Continuous.
+    - `AcquisitionMode` (String): Sets the acquisition mode of the device. Values possible: 'SingleFrame', 'MultiFrame', or 'Continuous'.
     - `AcquisitionFrameCount` (Int): Number of frames to acquire in MultiFrame Acquisition mode. Only evaluated if 'AcquisitionMode' is 'MultiFrame'.
     - `ExposureMode` (String): Sets the operation mode of the Exposure. Values possible: 'Off', 'Timed', 'TriggerWidth', or 'TriggerControlled'.
-    - `ExposureAuto` (String): Sets the automatic exposure mode when ExposureMode is Timed. alues possible: 'Off', 'Once', or 'Continuous'.
-    - `ExposureTime` (Double): Sets the Exposure time when 'ExposureMode' is 'Timed' and
-'ExposureAuto' is 'Off'.
-    - `AcquisitionFrameRateEnable` (Bool): Controls if the AcquisitionFrameRate feature is writable and used to
-control the acquisition rate.
-    - `AcquisitionFrameRate` (Double): Controls the acquisition rate (in Hertz) at which the frames are
-captured.
+    - `ExposureAuto` (String): Sets the automatic exposure mode when ExposureMode is Timed. Values possible: 'Off', 'Once', or 'Continuous'.
+    - `ExposureTime` (Double): Sets the Exposure time when 'ExposureMode' is 'Timed' and 'ExposureAuto' is 'Off'.
+    - `AcquisitionFrameRateEnable` (Bool): Controls if the AcquisitionFrameRate feature is writable and used to control the acquisition rate.
+    - `AcquisitionFrameRate` (Double): Controls the acquisition rate (in Hertz) at which the frames are captured.
+
+NOTE: The example values that are given in case of string parameters are given in accordance with the GenICam SNFC.
+The possible values might differ according to the actual implementation by the camera manufacturer.
 
 When launching the camera driver, the features are to be configured as nested launch parameters.
 While the parameters are evaluated by camera_aravis2 in the specific order which is listed above, they can be specified in an arbitrary order in the launch file.

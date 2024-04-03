@@ -58,6 +58,18 @@ struct Sensor
 
     /// Flip the image vertically on the device.
     bool reverse_y = false;
+
+    /// Number of pixel that are combined horizontally.
+    int binning_x = 1;
+
+    /// Mode to horizontally combine pixel.
+    std::string binning_mode_x = "";
+
+    /// Number of pixel that are combined vertically.
+    int binning_y = 1;
+
+    /// Mode to vertically combine pixel.
+    std::string binning_mode_y = "";
 };
 
 /**

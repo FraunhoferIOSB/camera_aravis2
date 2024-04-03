@@ -414,6 +414,51 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
                                         "'" + tmp_feature_name + "' is not as specified.");
 
+        //--- horizontal and vertical binning
+        tmp_feature_name = "BinningHorizontal";
+        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
+        if (is_parameter_set)
+            setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<int>(tmp_feature_name, sensor.binning_x);
+        if (is_parameter_set &&
+            !isParameterValueEqualTo<int64_t>(tmp_param_value, sensor.binning_x, i))
+            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                        "'" + tmp_feature_name + "' is not as specified.");
+
+        tmp_feature_name = "BinningHorizontalMode";
+        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
+        if (is_parameter_set)
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<std::string>(tmp_feature_name, sensor.binning_mode_x);
+        if (is_parameter_set &&
+            !isParameterValueEqualTo<std::string>(tmp_param_value, sensor.binning_mode_x, i))
+            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                        "'" + tmp_feature_name + "' is not as specified.");
+
+        tmp_feature_name = "BinningVertical";
+        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
+        if (is_parameter_set)
+            setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<int>(tmp_feature_name, sensor.binning_y);
+        if (is_parameter_set &&
+            !isParameterValueEqualTo<int64_t>(tmp_param_value, sensor.binning_y, i))
+            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                        "'" + tmp_feature_name + "' is not as specified.");
+
+        tmp_feature_name = "BinningVerticalMode";
+        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
+        if (is_parameter_set)
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<std::string>(tmp_feature_name, sensor.binning_mode_y);
+        if (is_parameter_set &&
+            !isParameterValueEqualTo<std::string>(tmp_param_value, sensor.binning_mode_y, i))
+            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                        "'" + tmp_feature_name + "' is not as specified.");
+
         //--- image roi width
         tmp_feature_name = "Width";
         tmp_min_int      = 0;
@@ -1001,6 +1046,18 @@ void CameraDriverGv::printCameraConfiguration() const
             RCLCPP_INFO(logger_, "    Reverse X,Y:         %s,%s",
                         (sensor.reverse_x) ? "True" : "False",
                         (sensor.reverse_y) ? "True" : "False");
+
+        if (getImageFormatControlParameter("BinningHorizontal", tmp_param_value) ||
+            getImageFormatControlParameter("BinningHorizontalMode", tmp_param_value) ||
+            getImageFormatControlParameter("BinningVertical", tmp_param_value) ||
+            getImageFormatControlParameter("BinningVerticalMode", tmp_param_value) ||
+            is_verbose_enable_)
+        {
+            RCLCPP_INFO(logger_, "    Binning X,Y:         %i,%i",
+                        sensor.binning_x, sensor.binning_y);
+            RCLCPP_INFO(logger_, "    Binning Mode X,Y:    %s,%s",
+                        sensor.binning_mode_x.c_str(), sensor.binning_mode_y.c_str());
+        }
 
         if (getImageFormatControlParameter("OffsetX", tmp_param_value) ||
             getImageFormatControlParameter("OffsetY", tmp_param_value) ||
