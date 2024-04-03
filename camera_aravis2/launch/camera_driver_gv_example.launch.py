@@ -62,9 +62,12 @@ def generate_launch_description():
 
                     # GenICam-specific parameters
                     "ImageFormatControl": {
+                        "BEGIN": {
+                            "BinningSelector": "Digital"
+                        },
                         "PixelFormat": ["BayerRG8", "Mono8"],
                         "Width": 1920,
-                        "Height": 1200,
+                        "Height": 1200
                     },
                     "AcquisitionControl": {
                         "ExposureTime": 10000.0,

@@ -32,6 +32,8 @@
 // Std
 #include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 // Aravis
 extern "C"
@@ -107,6 +109,33 @@ class CameraAravisNodeBase : public rclcpp::Node
     [[nodiscard]] bool discoverAndOpenCameraDevice();
 
     /**
+     * @brief Get nested parameter with 'param_name' with 'parent_name' as parent.
+     *
+     * @param[in] parent_name Name of the parent parameter.
+     * @param[in] param_name Name of the nested parameter underneath the parent.
+     * @param[out] param_value Parameter value.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getNestedParameter(const std::string& parent_name,
+                                          const std::string& param_name,
+                                          rclcpp::ParameterValue& param_value) const;
+
+    /**
+     * @brief Get list of nested parameter with 'param_name' with 'parent_name' as parent.
+     *
+     * @param[in] parent_name Name of the parent parameter.
+     * @param[in] param_name Name of the nested parameter underneath the parent.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if sub category is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getNestedParameterList(
+      const std::string& parent_name,
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
+
+    /**
      * @brief Get feature value if it is available.
      *
      * @tparam T Type of feature value.
@@ -145,6 +174,21 @@ class CameraAravisNodeBase : public rclcpp::Node
     bool setFeatureValueFromParameter(const std::string& feature_name,
                                       const rclcpp::ParameterValue& parameter_value,
                                       const uint& idx = 0) const;
+
+    /**
+     * @brief Set features from list of parameter values.
+     *
+     * This will loop through the list of parameter value associated with the feature names and call
+     * #setFeatureValueFromParameter accordingly.
+     *
+     * @param[in] param_values List of parameter values associated with feature names.
+     * @param[in] idx Index of parameter value that is to be set. Only used if parameter values are
+     * given as array.
+     * @return Returns true if successful, false otherwise.
+     */
+    bool setFeatureValuesFromParameterList(
+      const std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values,
+      const uint& idx = 0) const;
 
     /**
      * @brief Set bounded feature from parameter value if it is available.

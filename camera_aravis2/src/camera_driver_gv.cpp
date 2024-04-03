@@ -120,7 +120,7 @@ CameraDriverGv::~CameraDriverGv()
         stream.is_buffer_processed = false;
 
         //--- push empty object into queue to do final loop
-        stream.buffer_queue.push(std::make_tuple(nullptr, nullptr));
+        stream.buffer_queue.push(std::make_pair(nullptr, nullptr));
 
         if (stream.buffer_processing_thread.joinable())
             stream.buffer_processing_thread.join();
@@ -313,20 +313,19 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 }
 
 //==================================================================================================
-[[nodiscard]] inline bool CameraDriverGv::getImageFormatControlParameter(
+[[nodiscard]] bool CameraDriverGv::getImageFormatControlParameter(
   const std::string& param_name,
   rclcpp::ParameterValue& param_value) const
 {
-    std::string key = std::string("ImageFormatControl.").append(param_name);
-    if (parameter_overrides_.find(key) != parameter_overrides_.end())
-    {
-        param_value = parameter_overrides_.at(key);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+    return getNestedParameter("ImageFormatControl", param_name, param_value);
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::getImageFormatControlParameterList(
+  const std::string& param_name,
+  std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const
+{
+    return getNestedParameterList("ImageFormatControl", param_name, param_values);
 }
 
 //==================================================================================================
@@ -346,6 +345,7 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         std::string tmp_feature_name;
         rclcpp::ParameterValue tmp_param_value;
+        std::vector<std::pair<std::string, rclcpp::ParameterValue>> tmp_param_values;
         gint64 tmp_min_int, tmp_max_int;
 
         bool is_parameter_set;
@@ -358,9 +358,19 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             setFeatureValue<std::string>("SourceSelector", src_selector_val);
         }
 
+        //--- get and set given custom features at beginning of image format control
+        tmp_feature_name = "BEGIN";
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getImageFormatControlParameterList(tmp_feature_name,
+                                                              tmp_param_values);
+        if (is_parameter_set)
+            setFeatureValuesFromParameterList(tmp_param_values, i);
+
         //--- set desired pixel format and get actual value that has been set
         tmp_feature_name = "PixelFormat";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
@@ -387,13 +397,16 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         ASSERT_GERROR_MSG(err, logger_, "In getting 'Bits per Pixel'.", is_successful);
 
         //--- get sensor size
-        RCLCPP_DEBUG(logger_, "Evaluating 'SensorWidth' and 'SensorHeight' for stream %i.", i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.SensorWidth' and "
+                              "'ImageFormatControl.SensorHeight' for stream %i.",
+                     i);
         getFeatureValue<int>("SensorWidth", sensor.width);
         getFeatureValue<int>("SensorHeight", sensor.height);
 
         //--- horizontal and vertical flip
         tmp_feature_name = "ReverseX";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value, i);
@@ -404,7 +417,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         tmp_feature_name = "ReverseY";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value, i);
@@ -416,7 +430,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         //--- horizontal and vertical binning
         tmp_feature_name = "BinningHorizontal";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
@@ -427,7 +442,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         tmp_feature_name = "BinningHorizontalMode";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
@@ -438,7 +454,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         tmp_feature_name = "BinningVertical";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
@@ -449,7 +466,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         tmp_feature_name = "BinningVerticalMode";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
@@ -463,7 +481,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         tmp_feature_name = "Width";
         tmp_min_int      = 0;
         tmp_max_int      = sensor.width;
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         arv_device_get_integer_feature_bounds(p_device_, tmp_feature_name.c_str(),
                                               &tmp_min_int, &tmp_max_int, err.ref());
         image_roi.width_min = tmp_min_int,
@@ -484,7 +503,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         tmp_feature_name = "Height";
         tmp_min_int      = 0;
         tmp_max_int      = sensor.height;
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         arv_device_get_integer_feature_bounds(p_device_, tmp_feature_name.c_str(),
                                               &tmp_min_int, &tmp_max_int, err.ref());
         image_roi.height_min = tmp_min_int,
@@ -503,7 +523,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         //--- image roi offset x
         tmp_feature_name = "OffsetX";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
@@ -515,7 +536,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         //--- image roi height
         tmp_feature_name = "OffsetY";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
@@ -524,6 +546,15 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             !isParameterValueEqualTo<int64_t>(tmp_param_value, image_roi.y, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
                                         "'" + tmp_feature_name + "' is not as specified.");
+
+        //--- get and set given custom features at end of image format control
+        tmp_feature_name = "END";
+        RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getImageFormatControlParameterList(tmp_feature_name,
+                                                              tmp_param_values);
+        if (is_parameter_set)
+            setFeatureValuesFromParameterList(tmp_param_values, i);
 
         // NOTE: Not all parameters are essential, which is why only the success of some parameters
         // are checked.
@@ -535,20 +566,19 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 }
 
 //==================================================================================================
-[[nodiscard]] inline bool CameraDriverGv::getAcquisitionControlParameter(
+[[nodiscard]] bool CameraDriverGv::getAcquisitionControlParameter(
   const std::string& param_name,
   rclcpp::ParameterValue& param_value) const
 {
-    std::string key = std::string("AcquisitionControl.").append(param_name);
-    if (parameter_overrides_.find(key) != parameter_overrides_.end())
-    {
-        param_value = parameter_overrides_.at(key);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+    return getNestedParameter("AcquisitionControl", param_name, param_value);
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::getAcquisitionControlParameterList(
+  const std::string& param_name,
+  std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const
+{
+    return getNestedParameterList("AcquisitionControl", param_name, param_values);
 }
 
 //==================================================================================================
@@ -563,8 +593,10 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         std::string tmp_feature_name;
         rclcpp::ParameterValue tmp_param_value;
+        std::vector<std::pair<std::string, rclcpp::ParameterValue>> tmp_param_values;
 
-        gdouble tmp_min_dbl, tmp_max_dbl;
+        gdouble tmp_min_dbl,
+          tmp_max_dbl;
 
         bool is_parameter_set;
 
@@ -576,9 +608,19 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             setFeatureValue<std::string>("SourceSelector", src_selector_val);
         }
 
+        //--- get and set given custom features at beginning of acquisition control
+        tmp_feature_name = "BEGIN";
+        RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getAcquisitionControlParameterList(tmp_feature_name,
+                                                              tmp_param_values);
+        if (is_parameter_set)
+            setFeatureValuesFromParameterList(tmp_param_values, i);
+
         //--- Acquisition Mode
         tmp_feature_name = "AcquisitionMode";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
@@ -593,7 +635,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             ARV_ACQUISITION_MODE_MULTI_FRAME)
         {
             tmp_feature_name = "AcquisitionFrameCount";
-            RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+            RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                         tmp_feature_name.c_str(), i);
             is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
             if (is_parameter_set)
                 setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
@@ -606,7 +649,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         //--- Exposure Mode
         tmp_feature_name = "ExposureMode";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
@@ -618,7 +662,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         //--- Exposure Auto
         tmp_feature_name = "ExposureAuto";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
@@ -635,7 +680,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
               ARV_EXPOSURE_MODE_TIMED)
         {
             tmp_feature_name = "ExposureTime";
-            RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+            RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                         tmp_feature_name.c_str(), i);
             is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
             if (is_parameter_set)
                 setFeatureValueFromParameter<double>(tmp_feature_name, tmp_param_value, i);
@@ -648,7 +694,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         //--- Acquisition Frame Rate
         tmp_feature_name = "AcquisitionFrameRateEnable";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value, i);
@@ -659,7 +706,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         tmp_feature_name = "AcquisitionFrameRate";
-        RCLCPP_DEBUG(logger_, "Evaluating '%s' for stream %i.", tmp_feature_name.c_str(), i);
+        RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
         is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
         {
@@ -695,6 +743,15 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             !isParameterValueEqualTo<double>(tmp_param_value, acq_ctrl.frame_rate, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
                                         "'" + tmp_feature_name + "' is not as specified.");
+
+        //--- get and set given custom features at end of acquisition control
+        tmp_feature_name = "END";
+        RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getAcquisitionControlParameterList(tmp_feature_name,
+                                                              tmp_param_values);
+        if (is_parameter_set)
+            setFeatureValuesFromParameterList(tmp_param_values, i);
     }
 
     return true;
@@ -812,8 +869,8 @@ void CameraDriverGv::spawnCameraStreams()
             continue;
 
         new_buffer_cb_data_ptrs.push_back(
-          std::make_shared<std::tuple<CameraDriverGv*, uint>>(
-            std::make_tuple(this, i)));
+          std::make_shared<std::pair<CameraDriverGv*, uint>>(
+            std::make_pair(this, i)));
 
         g_signal_connect(STREAM.p_arv_stream, "new-buffer",
                          (GCallback)CameraDriverGv::handleNewBufferSignal,
@@ -883,12 +940,12 @@ void CameraDriverGv::processStreamBuffer(const uint stream_id)
     while (stream.is_buffer_processed)
     {
         //--- pop buffer pointer from queue, blocking if no item is available
-        std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr> buffer_img_tuple;
-        stream.buffer_queue.pop(buffer_img_tuple);
+        std::pair<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr> buffer_img_pair;
+        stream.buffer_queue.pop(buffer_img_pair);
 
         //--- take ownership of pointers
-        ArvBuffer* p_arv_buffer                      = std::get<0>(buffer_img_tuple);
-        sensor_msgs::msg::Image::SharedPtr p_img_msg = std::get<1>(buffer_img_tuple);
+        ArvBuffer* p_arv_buffer                      = std::get<0>(buffer_img_pair);
+        sensor_msgs::msg::Image::SharedPtr p_img_msg = std::get<1>(buffer_img_pair);
         if (!p_arv_buffer || !p_img_msg)
             continue;
 
@@ -1147,10 +1204,10 @@ void CameraDriverGv::printStreamStatistics() const
 void CameraDriverGv::handleNewBufferSignal(ArvStream* p_stream, gpointer p_user_data)
 {
     ///--- get data tuples from user data
-    std::tuple<CameraDriverGv*, uint>* p_data_tuple =
-      (std::tuple<CameraDriverGv*, uint>*)p_user_data;
-    CameraDriverGv* p_ca_instance = std::get<0>(*p_data_tuple);
-    uint stream_id                = std::get<1>(*p_data_tuple);
+    std::pair<CameraDriverGv*, uint>* p_data_tuple =
+      (std::pair<CameraDriverGv*, uint>*)p_user_data;
+    CameraDriverGv* p_ca_instance = p_data_tuple->first;
+    uint stream_id                = p_data_tuple->second;
 
     Stream& stream = p_ca_instance->streams_[stream_id];
 
@@ -1184,7 +1241,7 @@ void CameraDriverGv::handleNewBufferSignal(ArvStream* p_stream, gpointer p_user_
 
     //--- push buffer pointers into concurrent queue to be processed by processing thread
     auto p_img_msg = (*stream.p_buffer_pool)[p_arv_buffer];
-    stream.buffer_queue.push(std::make_tuple(p_arv_buffer, p_img_msg));
+    stream.buffer_queue.push(std::make_pair(p_arv_buffer, p_img_msg));
 }
 
 }  // end namespace camera_aravis2

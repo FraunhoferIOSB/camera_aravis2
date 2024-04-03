@@ -70,6 +70,7 @@ Camera_aravis2 explicitly looks for a number of features in a couple of categori
 If specified as launch parameter, camera_aravis2 will set the following features in the same order as listed below:
 
 - `ImageFormatControl`
+    - `BEGIN`: List of additional GenICam parameters that are not be set at the beginning of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
     - `PixelFormat` (String): Format of the pixels provided by the device
     - `ReverseX` (Bool): Flip horizontally the image sent by the device.
     - `ReverseY` (Bool): Flip vertically the image sent by the device.
@@ -81,7 +82,9 @@ If specified as launch parameter, camera_aravis2 will set the following features
     - `Height` (Int): Height of the image provided by the device (in pixels).
     - `OffsetX` (Int): Horizontal offset from the origin to the region of interest (in pixels).
     - `OffsetY` (Int): Vertical offset from the origin to the region of interest (in pixels).
+    - `END`: List of additional GenICam parameters that are not be set at the end of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
 - `AcquisitionControl`
+    - `BEGIN`: List of additional GenICam parameters that are not be set at the beginning of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
     - `AcquisitionMode` (String): Sets the acquisition mode of the device. Values possible: 'SingleFrame', 'MultiFrame', or 'Continuous'.
     - `AcquisitionFrameCount` (Int): Number of frames to acquire in MultiFrame Acquisition mode. Only evaluated if 'AcquisitionMode' is 'MultiFrame'.
     - `ExposureMode` (String): Sets the operation mode of the Exposure. Values possible: 'Off', 'Timed', 'TriggerWidth', or 'TriggerControlled'.
@@ -89,8 +92,13 @@ If specified as launch parameter, camera_aravis2 will set the following features
     - `ExposureTime` (Double): Sets the Exposure time when 'ExposureMode' is 'Timed' and 'ExposureAuto' is 'Off'.
     - `AcquisitionFrameRateEnable` (Bool): Controls if the AcquisitionFrameRate feature is writable and used to control the acquisition rate.
     - `AcquisitionFrameRate` (Double): Controls the acquisition rate (in Hertz) at which the frames are captured.
+    - `END`: List of additional GenICam parameters that are not be set at the end of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
 
-NOTE: The example values that are given in case of string parameters are given in accordance with the GenICam SNFC.
+At the beginning and the end of each section, the user can specify a list of additional GenICam parameters nested underneath the parameter `BEGIN` and `END`, respectively, which are not explicitly evaluated as part of the list above. 
+This allows for the user to specify parameters which are not known to camera_aravis2. 
+It is to be noted, however, that the nested parameters are evaluated in alphabetical order, which might lead to unintended behavior, depending on the camera device.
+
+The example values that are given in case of string parameters are given in accordance with the GenICam SNFC.
 The possible values might differ according to the actual implementation by the camera manufacturer.
 
 When launching the camera driver, the features are to be configured as nested launch parameters.
@@ -106,9 +114,12 @@ While the parameters are evaluated by camera_aravis2 in the specific order which
                     
                     # GenICam-specific parameters
                     "ImageFormatControl": {
+                        "BEGIN": {
+                            "BinningSelector": "Digital"
+                        },
                         "PixelFormat": "BayerRG8",
                         "Width": 1920,
-                        "Height": 1200,
+                        "Height": 1200
                     },
                     "AcquisitionControl": {
                         "ExposureMode": "Timed",

@@ -32,8 +32,8 @@
 // Std
 #include <memory>
 #include <string>
-#include <tuple>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 // Aravis
@@ -121,7 +121,7 @@ class CameraDriverGv : public CameraAravisNodeBase
         std::thread buffer_processing_thread;
 
         /// Concurrent queue holding the buffer data to be processed in a separate thread.
-        ConcurrentQueue<std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr>>
+        ConcurrentQueue<std::pair<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr>>
           buffer_queue;
     };
 
@@ -164,7 +164,7 @@ class CameraDriverGv : public CameraAravisNodeBase
     [[nodiscard]] bool setUpCameraStreamStructs();
 
     /**
-     * @brief Get parameter with 'parameter_name' within the list of image format control
+     * @brief Get parameter with 'param_name' within the list of image format control
      * parameters.
      *
      * @param[in] param_name Name of the nested parameter within image format control.
@@ -173,9 +173,23 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
      * False otherwise.
      */
-    [[nodiscard]] inline bool getImageFormatControlParameter(
+    [[nodiscard]] bool getImageFormatControlParameter(
       const std::string& param_name,
       rclcpp::ParameterValue& param_value) const;
+
+    /**
+     * @brief Get list of parameters underneath 'param_name' within the list of image format
+     * control parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within image format control.
+     * The method will prepend 'ImageFormatControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getImageFormatControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
 
     /**
      * @brief Set image format control settings of the camera.
@@ -196,9 +210,23 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
      * False otherwise.
      */
-    [[nodiscard]] inline bool getAcquisitionControlParameter(
+    [[nodiscard]] bool getAcquisitionControlParameter(
       const std::string& param_name,
       rclcpp::ParameterValue& param_value) const;
+
+    /**
+     * @brief Get list of parameters underneath 'param_name' within the list of acquisition control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within acquisition control.
+     * The method will prepend 'AcquisitionControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getAcquisitionControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
 
     /**
      * @brief Set acquisition control settings of the camera.
@@ -295,8 +323,8 @@ class CameraDriverGv : public CameraAravisNodeBase
     /// Thread in which the streams are spawned.
     std::thread spawn_stream_thread_;
 
-    /// List of pointers to data tuples for the new-buffer callback.
-    std::vector<std::shared_ptr<std::tuple<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;
+    /// List of pointers to data pair for the new-buffer callback.
+    std::vector<std::shared_ptr<std::pair<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;
 
     /// Flag indicating verbose output.
     bool is_verbose_enable_;

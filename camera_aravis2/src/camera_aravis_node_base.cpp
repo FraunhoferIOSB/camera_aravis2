@@ -158,6 +158,51 @@ void CameraAravisNodeBase::setUpParameters()
 }
 
 //==================================================================================================
+[[nodiscard]] bool CameraAravisNodeBase::getNestedParameter(
+  const std::string& parent_name,
+  const std::string& param_name,
+  rclcpp::ParameterValue& param_value) const
+{
+    std::string key = parent_name + "." + param_name;
+    if (parameter_overrides_.find(key) != parameter_overrides_.end())
+    {
+        param_value = parameter_overrides_.at(key);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraAravisNodeBase::getNestedParameterList(
+  const std::string& parent_name,
+  const std::string& param_name,
+  std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const
+{
+    param_values.clear();
+
+    std::string key = parent_name + "." + param_name;
+    for (auto itr = parameter_overrides_.begin();
+         itr != parameter_overrides_.end();
+         ++itr)
+    {
+        //--- if parameter override begins with key
+        if (itr->first.rfind(key) == 0)
+        {
+            std::string feature_name = itr->first.substr(key.size() + 1);
+            param_values.push_back(std::make_pair(feature_name, itr->second));
+        }
+    }
+
+    if (param_values.empty())
+        return false;
+    else
+        return true;
+}
+
+//==================================================================================================
 template <typename T>
 bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& value) const
 {
@@ -325,6 +370,47 @@ template bool CameraAravisNodeBase::setFeatureValueFromParameter<int64_t>(
   const std::string&, const rclcpp::ParameterValue&, const uint&) const;
 template bool CameraAravisNodeBase::setFeatureValueFromParameter<double>(
   const std::string&, const rclcpp::ParameterValue&, const uint&) const;
+
+//==================================================================================================
+bool CameraAravisNodeBase::setFeatureValuesFromParameterList(
+  const std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values,
+  const uint& idx) const
+{
+    bool is_successful = true;
+
+    for (auto itr = param_values.begin(); itr != param_values.end(); ++itr)
+    {
+        if (itr->second.get_type() == rclcpp::PARAMETER_BOOL ||
+            itr->second.get_type() == rclcpp::PARAMETER_BOOL_ARRAY)
+        {
+            is_successful &= setFeatureValueFromParameter<bool>(itr->first, itr->second, idx);
+        }
+        else if (itr->second.get_type() == rclcpp::PARAMETER_STRING ||
+                 itr->second.get_type() == rclcpp::PARAMETER_STRING_ARRAY)
+        {
+            is_successful &= setFeatureValueFromParameter<std::string>(itr->first, itr->second,
+                                                                       idx);
+        }
+        else if (itr->second.get_type() == rclcpp::PARAMETER_INTEGER ||
+                 itr->second.get_type() == rclcpp::PARAMETER_INTEGER_ARRAY)
+        {
+            is_successful &= setFeatureValueFromParameter<int64_t>(itr->first, itr->second, idx);
+        }
+        else if (itr->second.get_type() == rclcpp::PARAMETER_DOUBLE ||
+                 itr->second.get_type() == rclcpp::PARAMETER_DOUBLE_ARRAY)
+        {
+            is_successful &= setFeatureValueFromParameter<double>(itr->first, itr->second, idx);
+        }
+        else
+        {
+            RCLCPP_ERROR(logger_, "Parameter '%s' is of unknown type. ",
+                         itr->first.c_str());
+            is_successful = false;
+        }
+    }
+
+    return is_successful;
+}
 
 //==================================================================================================
 template <typename T>
