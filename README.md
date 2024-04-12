@@ -204,6 +204,12 @@ arv-tool-0.8 --name=<camera_guid> genicam
 
 ### Build
 
+Install aravis:
+
+```bash
+sudo apt install libaravis-dev
+```
+
 Initialize `rosdep` and install dependencies:
 
 ```bash
