@@ -187,6 +187,43 @@ class CameraDriverGv : public CameraAravisNodeBase
     [[nodiscard]] bool setDeviceControlSettings();
 
     /**
+     * @brief Get parameter with 'param_name' within the list of transport layer control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within transport layer control.
+     * The method will prepend 'TransportLayerControl.' to the parameter prior to the search.
+     * @param[out] param_value Parameter value.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getTransportLayerControlParameter(
+      const std::string& param_name,
+      rclcpp::ParameterValue& param_value) const;
+
+    /**
+     * @brief Get list of parameters underneath 'param_name' within the list of transport layer
+     * control parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within transport layer control.
+     * The method will prepend 'TransportLayerControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getTransportLayerControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
+
+    /**
+     * @brief Set transport layer control settings of the camera.
+     *
+     * For example: PtpEnable, GevSCPSPacketSize ...
+     *
+     * @return True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool setTransportLayerControlSettings();
+
+    /**
      * @brief Get parameter with 'param_name' within the list of image format control
      * parameters.
      *
@@ -337,6 +374,9 @@ class CameraDriverGv : public CameraAravisNodeBase
     //--- MEMBER DECLARATION ---//
 
   protected:
+    /// Transport layer control settings.
+    TransportLayerControl tl_control_;
+
     /// List of camera streams
     std::vector<Stream> streams_;
 
@@ -348,9 +388,6 @@ class CameraDriverGv : public CameraAravisNodeBase
 
     /// List of pointers to data pair for the new-buffer callback.
     std::vector<std::shared_ptr<std::pair<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;
-
-    /// Flag indicating to use PTP timestamp.
-    bool use_ptp_timestamp_;
 
     /// Message strings to warn the user of inconsistencies at summary output.
     std::vector<std::string> config_warn_msgs_;

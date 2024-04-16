@@ -65,6 +65,10 @@ def generate_launch_description():
                         "DeviceLinkThroughputLimit": 125000000,
                         "DeviceLinkThroughputLimitMode": "On"
                     },
+                    "TransportLayerControl": {
+                        "GevSCPSPacketSize": 9000,
+                        "PtpEnable": True
+                    },
                     "ImageFormatControl": {
                         "BEGIN": {
                             "BinningSelector": "Digital"

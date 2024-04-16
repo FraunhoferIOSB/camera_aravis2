@@ -33,6 +33,9 @@
 #include <cfloat>
 #include <string>
 
+namespace camera_aravis2
+{
+
 /**
  * @brief Struct representing sensor
  */
@@ -135,5 +138,29 @@ struct AcquisitionControl
     /// Maximum frame rate possible.
     double frame_rate_max = DBL_MAX;
 };
+
+/**
+ * @brief Struct holding control settings for transport layer.
+ *
+ */
+struct TransportLayerControl
+{
+    /// Packet size in pytes.
+    int64_t packet_size = 0;
+
+    /// Delay (in GEV timestamp counter unit) to insert between each packet
+    int64_t inter_packet_delay = 0;
+
+    /// Flag indicating if Precision Time Protocol (PTP) is enabled.
+    bool is_ptp_enable = false;
+
+    /// Status of PTP.
+    std::string ptp_status = "";
+
+    // Offset from the PTP master clock in nanoseconds.
+    int64_t ptp_offset = 0;
+};
+
+}  // namespace camera_aravis2
 
 #endif  // CAMERA_ARAVIS2__CONFIG_STRUCTS_H_

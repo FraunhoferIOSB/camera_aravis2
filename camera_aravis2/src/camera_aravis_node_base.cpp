@@ -234,6 +234,10 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
     {
         value = arv_device_get_integer_feature_value(p_device_, feature_name.c_str(), err.ref());
     }
+    else if constexpr (std::is_same_v<T, int64_t>)
+    {
+        value = arv_device_get_integer_feature_value(p_device_, feature_name.c_str(), err.ref());
+    }
     else if constexpr (std::is_same_v<T, float>)
     {
         value = static_cast<float>(
@@ -257,6 +261,7 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, bool&) const;
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, std::string&) const;
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, int&) const;
+template bool CameraAravisNodeBase::getFeatureValue(const std::string&, int64_t&) const;
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, float&) const;
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, double&) const;
 

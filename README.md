@@ -70,29 +70,36 @@ Camera_aravis2 explicitly looks for a number of features in a couple of categori
 If specified as launch parameter, camera_aravis2 will set the following features in the same order as listed below:
 
 - `DeviceControl`: List of GenICam parameters of the 'DeviceControl' category that are to be set. Here, no specific order is implemented. Nested parameter list is evaluated in alphabetical order.
+- `TransportLayerControl`
+    - `BEGIN`: List of additional GenICam parameters that are not be set at the beginning of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `GevSCPSPacketSize` (Int): Specifies the packet size, in bytes, which are to be send. This should correspond 'DeviceStreamChannelPacketSize' and the maximum transport unit (MTU) of the interface.
+    - `GevSCPD` (Int): Controls the delay (in GEV timestamp counter unit) to insert between
+each packet for this stream channel.
+    - `PtpEnable` (Bool): Enables the Precision Time Protocol (PTP).
+    - `END`: List of additional GenICam parameters that are not be set at the end of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
 - `ImageFormatControl`
     - `BEGIN`: List of additional GenICam parameters that are not be set at the beginning of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
-    - `PixelFormat` (String): Format of the pixels provided by the device
-    - `ReverseX` (Bool): Flip horizontally the image sent by the device.
-    - `ReverseY` (Bool): Flip vertically the image sent by the device.
-    - `BinningHorizontal` (Int): Number of pixels to horizontally combine together.
-    - `BinningHorizontalMode` (String): Mode to use when BinningHorizontal is used. Values possible: 'Sum', or 'Average'.
-    - `BinningVertical` (Int): Number of pixels to horizontally combine together.
-    - `BinningVerticalMode` (String): Mode to use when BinningHorizontal is used. Values possible: 'Sum', or 'Average'.
-    - `Width` (Int): Width of the image provided by the device (in pixels).
-    - `Height` (Int): Height of the image provided by the device (in pixels).
-    - `OffsetX` (Int): Horizontal offset from the origin to the region of interest (in pixels).
-    - `OffsetY` (Int): Vertical offset from the origin to the region of interest (in pixels).
+    - `PixelFormat`* (String): Format of the pixels provided by the device.
+    - `ReverseX`* (Bool): Flip horizontally the image sent by the device.
+    - `ReverseY`* (Bool): Flip vertically the image sent by the device.
+    - `BinningHorizontal`* (Int): Number of pixels to horizontally combine together.
+    - `BinningHorizontalMode`* (String): Mode to use when BinningHorizontal is used. Values possible: 'Sum', or 'Average'.
+    - `BinningVertical`* (Int): Number of pixels to horizontally combine together.
+    - `BinningVerticalMode`* (String): Mode to use when BinningHorizontal is used. Values possible: 'Sum', or 'Average'.
+    - `Width`* (Int): Width of the image provided by the device (in pixels).
+    - `Height`* (Int): Height of the image provided by the device (in pixels).
+    - `OffsetX`* (Int): Horizontal offset from the origin to the region of interest (in pixels).
+    - `OffsetY`* (Int): Vertical offset from the origin to the region of interest (in pixels).
     - `END`: List of additional GenICam parameters that are not be set at the end of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
 - `AcquisitionControl`
     - `BEGIN`: List of additional GenICam parameters that are not be set at the beginning of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
-    - `AcquisitionMode` (String): Sets the acquisition mode of the device. Values possible: 'SingleFrame', 'MultiFrame', or 'Continuous'.
-    - `AcquisitionFrameCount` (Int): Number of frames to acquire in MultiFrame Acquisition mode. Only evaluated if 'AcquisitionMode' is 'MultiFrame'.
-    - `ExposureMode` (String): Sets the operation mode of the Exposure. Values possible: 'Off', 'Timed', 'TriggerWidth', or 'TriggerControlled'.
-    - `ExposureAuto` (String): Sets the automatic exposure mode when ExposureMode is Timed. Values possible: 'Off', 'Once', or 'Continuous'.
-    - `ExposureTime` (Double): Sets the Exposure time when 'ExposureMode' is 'Timed' and 'ExposureAuto' is 'Off'.
-    - `AcquisitionFrameRateEnable` (Bool): Controls if the AcquisitionFrameRate feature is writable and used to control the acquisition rate.
-    - `AcquisitionFrameRate` (Double): Controls the acquisition rate (in Hertz) at which the frames are captured.
+    - `AcquisitionMode`* (String): Sets the acquisition mode of the device. Values possible: 'SingleFrame', 'MultiFrame', or 'Continuous'.
+    - `AcquisitionFrameCount`* (Int): Number of frames to acquire in MultiFrame Acquisition mode. Only evaluated if 'AcquisitionMode' is 'MultiFrame'.
+    - `ExposureMode`* (String): Sets the operation mode of the Exposure. Values possible: 'Off', 'Timed', 'TriggerWidth', or 'TriggerControlled'.
+    - `ExposureAuto`* (String): Sets the automatic exposure mode when ExposureMode is Timed. Values possible: 'Off', 'Once', or 'Continuous'.
+    - `ExposureTime`* (Double): Sets the Exposure time when 'ExposureMode' is 'Timed' and 'ExposureAuto' is 'Off'.
+    - `AcquisitionFrameRateEnable`* (Bool): Controls if the AcquisitionFrameRate feature is writable and used to control the acquisition rate.
+    - `AcquisitionFrameRate`* (Double): Controls the acquisition rate (in Hertz) at which the frames are captured.
     - `END`: List of additional GenICam parameters that are not be set at the end of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
 
 In the sections where a certain order of predefined parameters is considered and implemented, the user can specify a list of additional GenICam parameters nested underneath the parameter `BEGIN` and `END`, respectively, which are not explicitly evaluated as part of the list above. 
@@ -102,6 +109,13 @@ It is to be noted, however, that the nested parameters are evaluated in alphabet
 
 The example values that are given in case of string parameters are given in accordance with the GenICam SNFC.
 The possible values might differ according to the actual implementation by the camera manufacturer.
+
+Parameters marked with * are evaluated and set per stream/channel. 
+Meaning, that for a multi-channel or multi-source camera one can either specify a single parameter or a list of parameters (see 'PixelFormat' in the example below).
+In case a single parameter is specified, the corresponding value is set for all channels.
+If a list of parameters is given, for each channel the value with the corresponding channel index will be set.
+If the list is smaller than the available channels, the value of the last entry will be set for the remaining channels.
+Please note, that the flexibility of setting different parameters values for the individual channels depends on the actual implementation by the camera manufacturer.
 
 When launching the camera driver, the features are to be configured as nested launch parameters.
 While the parameters are evaluated by camera_aravis2 in the specific order which is listed above, they can be specified in an arbitrary order in the launch file.
@@ -118,6 +132,10 @@ While the parameters are evaluated by camera_aravis2 in the specific order which
                     "DeviceControl": {
                         "DeviceLinkThroughputLimit": 125000000,
                         "DeviceLinkThroughputLimitMode": "On"
+                    },
+                    "TransportLayerControl": {
+                        "GevSCPSPacketSize": 9000,
+                        "PtpEnable": True
                     },
                     "ImageFormatControl": {
                         "BEGIN": {

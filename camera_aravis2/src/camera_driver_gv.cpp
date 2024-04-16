@@ -50,8 +50,7 @@ namespace camera_aravis2
 //==================================================================================================
 CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
   CameraAravisNodeBase("camera_driver_gv", options),
-  is_spawning_(false),
-  use_ptp_timestamp_(false)
+  is_spawning_(false)
 {
     //--- setup parameters
     setUpParameters();
@@ -76,6 +75,9 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
 
     //--- set device control settings
     ASSERT_SUCCESS(setDeviceControlSettings());
+
+    //--- set transport layer control settings
+    ASSERT_SUCCESS(setTransportLayerControlSettings());
 
     //--- set image format control settings
     ASSERT_SUCCESS(setImageFormatControlSettings());
@@ -342,6 +344,86 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 }
 
 //==================================================================================================
+[[nodiscard]] bool CameraDriverGv::getTransportLayerControlParameter(
+  const std::string& param_name,
+  rclcpp::ParameterValue& param_value) const
+{
+    return getNestedParameter("TransportLayerControl", param_name, param_value);
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::getTransportLayerControlParameterList(
+  const std::string& param_name,
+  std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const
+{
+    return getNestedParameterList("TransportLayerControl", param_name, param_values);
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::setTransportLayerControlSettings()
+{
+    GuardedGError err;
+
+    std::string tmp_feature_name;
+    rclcpp::ParameterValue tmp_param_value;
+    std::vector<std::pair<std::string, rclcpp::ParameterValue>> tmp_param_values;
+
+    bool is_parameter_set;
+
+    //--- get and set given custom features at beginning of transport layer control
+    tmp_feature_name = "BEGIN";
+    RCLCPP_DEBUG(logger_, "Evaluating 'TransportLayerControl.%s'.", tmp_feature_name.c_str());
+    is_parameter_set = getTransportLayerControlParameterList(tmp_feature_name,
+                                                             tmp_param_values);
+    if (is_parameter_set)
+        setFeatureValuesFromParameterList(tmp_param_values);
+
+    //--- GevSCPSPacketSize
+    tmp_feature_name = "GevSCPSPacketSize";
+    RCLCPP_DEBUG(logger_, "Evaluating 'TransportLayerControl.%s'", tmp_feature_name.c_str());
+    is_parameter_set = getTransportLayerControlParameter(tmp_feature_name, tmp_param_value);
+    if (is_parameter_set)
+        setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value);
+    getFeatureValue<int64_t>(tmp_feature_name, tl_control_.packet_size);
+    if (is_parameter_set &&
+        !isParameterValueEqualTo<int64_t>(tmp_param_value, tl_control_.packet_size))
+        config_warn_msgs_.push_back("'" + tmp_feature_name + "' is not as specified.");
+
+    //--- GevSCPD
+    tmp_feature_name = "GevSCPD";
+    RCLCPP_DEBUG(logger_, "Evaluating 'TransportLayerControl.%s'", tmp_feature_name.c_str());
+    is_parameter_set = getTransportLayerControlParameter(tmp_feature_name, tmp_param_value);
+    if (is_parameter_set)
+        setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value);
+    getFeatureValue<int64_t>(tmp_feature_name, tl_control_.inter_packet_delay);
+    if (is_parameter_set &&
+        !isParameterValueEqualTo<int64_t>(tmp_param_value, tl_control_.inter_packet_delay))
+        config_warn_msgs_.push_back("'" + tmp_feature_name + "' is not as specified.");
+
+    //--- set PTP Enable
+    tmp_feature_name = "PtpEnable";
+    RCLCPP_DEBUG(logger_, "Evaluating 'TransportLayerControl.%s'", tmp_feature_name.c_str());
+    is_parameter_set = getTransportLayerControlParameter(tmp_feature_name, tmp_param_value);
+    if (is_parameter_set)
+        setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value);
+    getFeatureValue<bool>(tmp_feature_name, tl_control_.is_ptp_enable);
+    if (is_parameter_set &&
+        !isParameterValueEqualTo<bool>(tmp_param_value, tl_control_.is_ptp_enable))
+        config_warn_msgs_.push_back("'" + tmp_feature_name + "' is not as specified.");
+
+    //--- get and set given custom features at end of transport layer control
+    tmp_feature_name = "END";
+    RCLCPP_DEBUG(logger_, "Evaluating 'TransportLayerControl.%s'.",
+                 tmp_feature_name.c_str());
+    is_parameter_set = getTransportLayerControlParameterList(tmp_feature_name,
+                                                             tmp_param_values);
+    if (is_parameter_set)
+        setFeatureValuesFromParameterList(tmp_param_values);
+
+    return true;
+}
+
+//==================================================================================================
 [[nodiscard]] bool CameraDriverGv::getImageFormatControlParameter(
   const std::string& param_name,
   rclcpp::ParameterValue& param_value) const
@@ -441,7 +523,7 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value, i);
         getFeatureValue<bool>(tmp_feature_name, sensor.reverse_x);
         if (is_parameter_set &&
-            !isParameterValueEqualTo<int64_t>(tmp_param_value, sensor.reverse_x, i))
+            !isParameterValueEqualTo<bool>(tmp_param_value, sensor.reverse_x, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
                                         "'" + tmp_feature_name + "' is not as specified.");
 
@@ -453,7 +535,7 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value, i);
         getFeatureValue<bool>(tmp_feature_name, sensor.reverse_y);
         if (is_parameter_set &&
-            !isParameterValueEqualTo<int64_t>(tmp_param_value, sensor.reverse_y, i))
+            !isParameterValueEqualTo<bool>(tmp_param_value, sensor.reverse_y, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
                                         "'" + tmp_feature_name + "' is not as specified.");
 
@@ -1036,7 +1118,7 @@ void CameraDriverGv::fillImageMsgMetadata(sensor_msgs::msg::Image::SharedPtr& p_
 {
     //--- fill header data
 
-    p_img_msg->header.stamp    = rclcpp::Time(use_ptp_timestamp_
+    p_img_msg->header.stamp    = rclcpp::Time(tl_control_.is_ptp_enable
                                                 ? arv_buffer_get_timestamp(p_buffer)
                                                 : arv_buffer_get_system_timestamp(p_buffer));
     p_img_msg->header.frame_id = sensor.frame_id;
@@ -1081,6 +1163,8 @@ void CameraDriverGv::fillCameraInfoMsg(Stream& stream,
 //==================================================================================================
 void CameraDriverGv::printCameraConfiguration() const
 {
+    rclcpp::ParameterValue tmp_param_value;
+
     RCLCPP_INFO(logger_, "======================================");
     RCLCPP_INFO(logger_, "Camera Configuration:");
     RCLCPP_INFO(logger_, "--------------------------------------");
@@ -1097,6 +1181,22 @@ void CameraDriverGv::printCameraConfiguration() const
                     static_cast<int>(streams_.size()));
     }
 
+    if (getTransportLayerControlParameter("GevSCPSPacketSize", tmp_param_value) ||
+        is_verbose_enable_)
+        RCLCPP_INFO(logger_, "  GEV Packet Size (B):   %li", tl_control_.packet_size);
+
+    if (getTransportLayerControlParameter("GevSCPD", tmp_param_value) ||
+        is_verbose_enable_)
+        RCLCPP_INFO(logger_, "  GEV Packet Delay:      %li", tl_control_.inter_packet_delay);
+
+    if (getTransportLayerControlParameter("PtpEnable", tmp_param_value) ||
+        is_verbose_enable_)
+    {
+        RCLCPP_INFO(logger_, "  PTP Enabled:           %s",
+                    (tl_control_.is_ptp_enable) ? "True" : "False");
+        RCLCPP_INFO(logger_, "  PTP Status:            %s", tl_control_.ptp_status.c_str());
+    }
+
     for (uint i = 0; i < streams_.size(); i++)
     {
         const Stream& stream               = streams_[i];
@@ -1104,7 +1204,6 @@ void CameraDriverGv::printCameraConfiguration() const
         const ImageRoi& roi                = stream.image_roi;
         const AcquisitionControl& acq_ctrl = stream.acquisition_control;
 
-        rclcpp::ParameterValue tmp_param_value;
         RCLCPP_INFO(logger_, "  - - - - - - - - - - - - - - - - - - ");
         RCLCPP_INFO(logger_, "  Stream %i:              %s", i, stream.name.c_str());
 
