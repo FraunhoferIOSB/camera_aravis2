@@ -674,18 +674,16 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         //--- Exposure Time
+        tmp_feature_name = "ExposureTime";
+        RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
         if (arv_auto_from_string(acq_ctrl.exposure_auto.c_str()) ==
               ARV_AUTO_OFF &&
             arv_exposure_mode_from_string(acq_ctrl.exposure_mode.c_str()) ==
-              ARV_EXPOSURE_MODE_TIMED)
-        {
-            tmp_feature_name = "ExposureTime";
-            RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
-                         tmp_feature_name.c_str(), i);
-            is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
-            if (is_parameter_set)
-                setFeatureValueFromParameter<double>(tmp_feature_name, tmp_param_value, i);
-        }
+              ARV_EXPOSURE_MODE_TIMED &&
+            is_parameter_set)
+            setFeatureValueFromParameter<double>(tmp_feature_name, tmp_param_value, i);
         getFeatureValue<double>(tmp_feature_name, acq_ctrl.exposure_time);
         if (is_parameter_set &&
             !isParameterValueEqualTo<double>(tmp_param_value, acq_ctrl.exposure_time, i))
