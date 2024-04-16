@@ -524,6 +524,35 @@ template bool CameraAravisNodeBase::isParameterValueEqualTo<double>(
   const rclcpp::ParameterValue&, const double&, const uint&) const;
 
 //==================================================================================================
+bool CameraAravisNodeBase::executeCommand(const std::string& feature_name) const
+{
+    bool is_successful = true;
+    GuardedGError err;
+
+    //--- assert that p_device is set
+    if (!p_device_)
+        return false;
+
+    RCLCPP_DEBUG(logger_, "Executing command '%s'.", feature_name.c_str());
+
+    //--- check if feature is available
+    if (!arv_device_is_feature_available(p_device_, feature_name.c_str(), err.ref()))
+    {
+        RCLCPP_WARN(logger_, "Command '%s' is not available. Value will not be executed.",
+                    feature_name.c_str());
+        ASSERT_GERROR(err, logger_, is_successful);
+        return false;
+    }
+
+    arv_device_execute_command(p_device_, feature_name.c_str(), err.ref());
+
+    ASSERT_GERROR_MSG(err, logger_,
+                      "In executing command '" + feature_name + "'.", is_successful);
+
+    return is_successful;
+}
+
+//==================================================================================================
 std::string CameraAravisNodeBase::constructCameraGuidStr(ArvCamera* p_cam)
 {
     const char* vendor_name = arv_camera_get_vendor_name(p_cam, nullptr);

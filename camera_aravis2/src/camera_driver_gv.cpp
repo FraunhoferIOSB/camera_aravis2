@@ -85,6 +85,10 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     //--- set acquisition control settings
     ASSERT_SUCCESS(setAcquisitionControlSettings());
 
+    //--- check ptp
+    if (tl_control_.is_ptp_enable)
+        checkPtp();
+
     //--- print currently applied camera configuration
     printCameraConfiguration();
 
@@ -1037,6 +1041,33 @@ void CameraDriverGv::tuneGvStream(ArvGvStream* p_stream) const
 }
 
 //==================================================================================================
+void CameraDriverGv::checkPtp()
+{
+    //--- get status
+    getFeatureValue<std::string>("PtpStatus", tl_control_.ptp_status);
+
+    //--- check if clock needs reset
+    if (tl_control_.ptp_status == "Faulty" || tl_control_.ptp_status == "Disabled" ||
+        tl_control_.ptp_status == "Initializing" || tl_control_.ptp_status == "Uncalibrated")
+    {
+        RCLCPP_INFO_EXPRESSION(logger_, is_verbose_enable_,
+                               "PTP Status: %s. Resetting PTP clock.",
+                               tl_control_.ptp_status.c_str());
+
+        setFeatureValue<bool>("PtpEnable", false);
+        setFeatureValue<bool>("PtpEnable", true);
+
+        executeCommand("PtpDataSetLatch");
+
+        getFeatureValue<std::string>("PtpStatus", tl_control_.ptp_status);
+
+        RCLCPP_INFO_EXPRESSION(logger_, is_verbose_enable_,
+                               "New PTP Status: %s.",
+                               tl_control_.ptp_status.c_str());
+    }
+}
+
+//==================================================================================================
 void CameraDriverGv::processStreamBuffer(const uint stream_id)
 {
     using namespace std::chrono_literals;
@@ -1086,6 +1117,10 @@ void CameraDriverGv::processStreamBuffer(const uint stream_id)
 
         //--- publish
         stream.camera_pub.publish(p_img_msg, stream.p_cam_info_msg);
+
+        //--- check ptp
+        if (tl_control_.is_ptp_enable)
+            checkPtp();
     }
 
     RCLCPP_INFO(logger_, "Finished processing thread for stream %i (%s)", stream_id,

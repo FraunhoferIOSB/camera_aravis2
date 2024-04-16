@@ -313,6 +313,13 @@ class CameraDriverGv : public CameraAravisNodeBase
     void tuneGvStream(ArvGvStream* p_stream) const;
 
     /**
+     * @brief Check the status of the Precision Time Protocol and reset its clock if applicable.     *
+     * The clock will only be reset if the status of PTP is "Faulty", "Disabled", or
+     * "Initializing".
+     */
+    void checkPtp();
+
+    /**
      * @brief Process available stream buffer.
      *
      * @param[in] stream_id ID of stream for which the buffer is to be processed.

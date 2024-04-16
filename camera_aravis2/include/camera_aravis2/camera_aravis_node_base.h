@@ -230,6 +230,14 @@ class CameraAravisNodeBase : public rclcpp::Node
                                  const T& test_value,
                                  const uint& idx = 0) const;
 
+    /**
+     * @brief Execute command with given feature name.
+     *
+     * @param[in] feature_name Name of command feature.
+     * @return Returns true if successful, false otherwise (e.g. command feature is not available).
+     */
+    bool executeCommand(const std::string& feature_name) const;
+
     //--- FUNCTION DECLARATION ---//
 
   protected:
