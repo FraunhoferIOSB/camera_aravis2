@@ -45,7 +45,8 @@ CameraAravisNodeBase::CameraAravisNodeBase(const std::string& name,
   logger_(this->get_logger()),
   p_device_(nullptr),
   p_camera_(nullptr),
-  guid_("")
+  guid_(""),
+  is_verbose_enable_(false)
 {
 }
 
@@ -183,7 +184,9 @@ void CameraAravisNodeBase::setUpParameters()
 {
     param_values.clear();
 
-    std::string key = parent_name + "." + param_name;
+    //--- if param_name is not empty append with '.' to parent name.
+    std::string key = (!param_name.empty()) ? parent_name + "." + param_name : parent_name;
+
     for (auto itr = parameter_overrides_.begin();
          itr != parameter_overrides_.end();
          ++itr)
@@ -267,6 +270,8 @@ bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, cons
     //--- assert that p_device is set
     if (!p_device_)
         return false;
+
+    RCLCPP_DEBUG_STREAM(logger_, "Setting '" << feature_name << "' to '" << value << "'");
 
     //--- check if feature is available
     if (!arv_device_is_feature_available(p_device_, feature_name.c_str(), err.ref()))

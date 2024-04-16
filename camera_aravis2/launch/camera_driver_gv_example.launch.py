@@ -61,6 +61,10 @@ def generate_launch_description():
                     "verbose": False,
 
                     # GenICam-specific parameters
+                    "DeviceControl": {
+                        "DeviceLinkThroughputLimit": 125000000,
+                        "DeviceLinkThroughputLimitMode": "On"
+                    },
                     "ImageFormatControl": {
                         "BEGIN": {
                             "BinningSelector": "Digital"

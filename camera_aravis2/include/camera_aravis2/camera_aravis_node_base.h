@@ -125,7 +125,8 @@ class CameraAravisNodeBase : public rclcpp::Node
      * @brief Get list of nested parameter with 'param_name' with 'parent_name' as parent.
      *
      * @param[in] parent_name Name of the parent parameter.
-     * @param[in] param_name Name of the nested parameter underneath the parent.
+     * @param[in] param_name Name of the nested parameter underneath the parent. If 'param_name' is
+     * left empty, all nested parameters will be searched for underneath 'parent_name'.
      * @param[out] param_values List of parameter values associated with feature names.
      * @return True if sub category is found in 'parameter_overrides_' and, thus, given by the user.
      * False otherwise.
@@ -268,6 +269,9 @@ class CameraAravisNodeBase : public rclcpp::Node
 
     /// List of parameter overrides, including parameters that have not been declared.
     std::map<std::string, rclcpp::ParameterValue> parameter_overrides_;
+
+    /// Flag indicating verbose output.
+    bool is_verbose_enable_;
 };
 
 }  // namespace camera_aravis2

@@ -51,7 +51,6 @@ namespace camera_aravis2
 CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
   CameraAravisNodeBase("camera_driver_gv", options),
   is_spawning_(false),
-  is_verbose_enable_(false),
   use_ptp_timestamp_(false)
 {
     //--- setup parameters
@@ -75,10 +74,13 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     //--- set up structs holding relevant information of camera streams
     ASSERT_SUCCESS(setUpCameraStreamStructs());
 
-    //--- initialize and set pixel format settings
+    //--- set device control settings
+    ASSERT_SUCCESS(setDeviceControlSettings());
+
+    //--- set image format control settings
     ASSERT_SUCCESS(setImageFormatControlSettings());
 
-    //--- set standard camera settings
+    //--- set acquisition control settings
     ASSERT_SUCCESS(setAcquisitionControlSettings());
 
     //--- print currently applied camera configuration
@@ -308,6 +310,33 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         RCLCPP_FATAL(logger_, "Something went wrong in the initialization of the camera streams.");
         return false;
     }
+
+    return true;
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::getDeviceControlParameterList(
+  const std::string& param_name,
+  std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const
+{
+    return getNestedParameterList("DeviceControl", param_name, param_values);
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::setDeviceControlSettings()
+{
+    GuardedGError err;
+
+    rclcpp::ParameterValue tmp_param_value;
+    std::vector<std::pair<std::string, rclcpp::ParameterValue>> tmp_param_values;
+
+    bool is_parameter_set;
+
+    //--- get and set given custom features at beginning of image format control
+    RCLCPP_DEBUG(logger_, "Evaluating 'DeviceControl.*'.");
+    is_parameter_set = getDeviceControlParameterList("", tmp_param_values);
+    if (is_parameter_set)
+        setFeatureValuesFromParameterList(tmp_param_values);
 
     return true;
 }

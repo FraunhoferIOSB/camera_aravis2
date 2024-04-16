@@ -69,6 +69,7 @@ The SNFC groups the individual features into numerous catagories (e.g. Image For
 Camera_aravis2 explicitly looks for a number of features in a couple of categories to be specified and tries to set the features accordingly. 
 If specified as launch parameter, camera_aravis2 will set the following features in the same order as listed below:
 
+- `DeviceControl`: List of GenICam parameters of the 'DeviceControl' category that are to be set. Here, no specific order is implemented. Nested parameter list is evaluated in alphabetical order.
 - `ImageFormatControl`
     - `BEGIN`: List of additional GenICam parameters that are not be set at the beginning of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
     - `PixelFormat` (String): Format of the pixels provided by the device
@@ -94,8 +95,9 @@ If specified as launch parameter, camera_aravis2 will set the following features
     - `AcquisitionFrameRate` (Double): Controls the acquisition rate (in Hertz) at which the frames are captured.
     - `END`: List of additional GenICam parameters that are not be set at the end of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
 
-At the beginning and the end of each section, the user can specify a list of additional GenICam parameters nested underneath the parameter `BEGIN` and `END`, respectively, which are not explicitly evaluated as part of the list above. 
+In the sections where a certain order of predefined parameters is considered and implemented, the user can specify a list of additional GenICam parameters nested underneath the parameter `BEGIN` and `END`, respectively, which are not explicitly evaluated as part of the list above. 
 This allows for the user to specify parameters which are not known to camera_aravis2. 
+Similar holds for the parameters within the 'DeviceControl' category.
 It is to be noted, however, that the nested parameters are evaluated in alphabetical order, which might lead to unintended behavior, depending on the camera device.
 
 The example values that are given in case of string parameters are given in accordance with the GenICam SNFC.
@@ -113,6 +115,10 @@ While the parameters are evaluated by camera_aravis2 in the specific order which
                     ...
                     
                     # GenICam-specific parameters
+                    "DeviceControl": {
+                        "DeviceLinkThroughputLimit": 125000000,
+                        "DeviceLinkThroughputLimitMode": "On"
+                    },
                     "ImageFormatControl": {
                         "BEGIN": {
                             "BinningSelector": "Digital"

@@ -164,6 +164,29 @@ class CameraDriverGv : public CameraAravisNodeBase
     [[nodiscard]] bool setUpCameraStreamStructs();
 
     /**
+     * @brief Get list of parameters underneath 'param_name' within the list of device
+     * control parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within device control.
+     * The method will prepend 'DeviceControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getDeviceControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
+
+    /**
+     * @brief Set device control settings of the camera.
+     *
+     * For example: DeviceLinkThroughputLimit ...
+     *
+     * @return True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool setDeviceControlSettings();
+
+    /**
      * @brief Get parameter with 'param_name' within the list of image format control
      * parameters.
      *
@@ -325,9 +348,6 @@ class CameraDriverGv : public CameraAravisNodeBase
 
     /// List of pointers to data pair for the new-buffer callback.
     std::vector<std::shared_ptr<std::pair<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;
-
-    /// Flag indicating verbose output.
-    bool is_verbose_enable_;
 
     /// Flag indicating to use PTP timestamp.
     bool use_ptp_timestamp_;
