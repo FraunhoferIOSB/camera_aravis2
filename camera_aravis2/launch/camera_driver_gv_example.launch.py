@@ -58,7 +58,7 @@ def generate_launch_description():
                     "camera_info_urls": ["file://" + os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example.yaml')],
-                    "verbose": True,
+                    "verbose": False,
 
                     # GenICam-specific parameters
                     "DeviceControl": {
@@ -83,6 +83,14 @@ def generate_launch_description():
                         "ExposureMode": "Timed",
                         "AcquisitionFrameRateEnable": True,
                         "AcquisitionFrameRate": 30.0
+                    },
+                    "AnalogControl": {
+                        "GainAuto": "Continuous",
+                        "BalanceWhiteAuto": "Off",
+                        "BalanceRatio": {
+                            "Red": 1.6,
+                            "Blue": 2.0
+                        }
                     }
                 }
             ]

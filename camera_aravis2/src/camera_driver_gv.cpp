@@ -85,6 +85,9 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     //--- set acquisition control settings
     ASSERT_SUCCESS(setAcquisitionControlSettings());
 
+    //--- set analog control settings
+    ASSERT_SUCCESS(setAnalogControlSettings());
+
     //--- check ptp
     if (tl_control_.is_ptp_enable)
         checkPtp();
@@ -382,6 +385,13 @@ bool CameraDriverGv::setUpCameraStreamStructs()
     if (is_parameter_set)
         setFeatureValuesFromParameterList(tmp_param_values);
 
+    //--- for specific parameters, proceed as follows:
+    //---   1. Check and read parameter from launch parameters
+    //---   2. If provided in launch parameter, set value on device
+    //---   3. Get the set value from the device and store it in corresponding struct
+    //---   4. If specific parameter was given in the launch parameters, check against the actual
+    //---       value which has been read from the camera and issue a warning message if applicable
+
     //--- GevSCPSPacketSize
     tmp_feature_name = "GevSCPSPacketSize";
     RCLCPP_DEBUG(logger_, "Evaluating 'TransportLayerControl.%s'", tmp_feature_name.c_str());
@@ -482,7 +492,18 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         if (is_parameter_set)
             setFeatureValuesFromParameterList(tmp_param_values, i);
 
-        //--- set desired pixel format and get actual value that has been set
+        //--- for specific parameters, proceed as follows:
+        //---   1. Check and read parameter from launch parameters
+        //---   2. If provided in launch parameter, set value on device
+        //---   3. Get the set value from the device and store it in corresponding struct
+        //---   4. If specific parameter was given in the launch parameters, check against the
+        //---       actual value which has been read from the camera and issue a warning message
+        //---       if applicable
+        //---
+        //---   For bounded feature values (e.g. image size), get the bounds prior to setting
+        //---   the value and use appropriate method that will truncate value to bounds
+
+        //--- PixelFormat
         tmp_feature_name = "PixelFormat";
         RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.%s' for stream %i.",
                      tmp_feature_name.c_str(), i);
@@ -593,6 +614,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         //--- image roi width
+        //--- separately get the feature bounds in order to have them even if the width is not
+        //--- to be set
         tmp_feature_name = "Width";
         tmp_min_int      = 0;
         tmp_max_int      = sensor.width;
@@ -606,8 +629,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
-            setBoundedFeatureValueFromParameter<int64_t>(
-              tmp_feature_name, tmp_min_int, tmp_max_int, tmp_param_value, i);
+            setFeatureValueFromParameter<int64_t>(
+              tmp_feature_name, tmp_param_value, tmp_min_int, tmp_max_int, i);
         getFeatureValue<int>(tmp_feature_name, image_roi.width);
         if (is_parameter_set &&
             !isParameterValueEqualTo<int64_t>(tmp_param_value, image_roi.width, i))
@@ -615,6 +638,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         //--- image roi height
+        //--- separately get the feature bounds in order to have them even if the height is not
+        //--- to be set
         tmp_feature_name = "Height";
         tmp_min_int      = 0;
         tmp_max_int      = sensor.height;
@@ -628,8 +653,8 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
-            setBoundedFeatureValueFromParameter<int64_t>(
-              tmp_feature_name, tmp_min_int, tmp_max_int, tmp_param_value, i);
+            setFeatureValueFromParameter<int64_t>(
+              tmp_feature_name, tmp_param_value, tmp_min_int, tmp_max_int, i);
         getFeatureValue<int>(tmp_feature_name, image_roi.height);
         if (is_parameter_set &&
             !isParameterValueEqualTo<int64_t>(tmp_param_value, image_roi.height, i))
@@ -732,6 +757,17 @@ bool CameraDriverGv::setUpCameraStreamStructs()
         if (is_parameter_set)
             setFeatureValuesFromParameterList(tmp_param_values, i);
 
+        //--- for specific parameters, proceed as follows:
+        //---   1. Check and read parameter from launch parameters
+        //---   2. If provided in launch parameter, set value on device
+        //---   3. Get the set value from the device and store it in corresponding struct
+        //---   4. If specific parameter was given in the launch parameters, check against the
+        //---       actual value which has been read from the camera and issue a warning message
+        //---       if applicable
+        //---
+        //---   For bounded feature values (e.g. frame rate), use function that will also get
+        //---   the bounds and truncate the value accordingly
+
         //--- Acquisition Mode
         tmp_feature_name = "AcquisitionMode";
         RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
@@ -746,6 +782,7 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         //--- Acquisition Frame Count
+        //--- get and set only if acquisition mode is set to multi frame
         if (arv_acquisition_mode_from_string(acq_ctrl.acquisition_mode.c_str()) ==
             ARV_ACQUISITION_MODE_MULTI_FRAME)
         {
@@ -789,6 +826,7 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         //--- Exposure Time
+        //--- set only if auto exposure is off and exposure mode is set to timed
         tmp_feature_name = "ExposureTime";
         RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
                      tmp_feature_name.c_str(), i);
@@ -806,6 +844,7 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                                         "'" + tmp_feature_name + "' is not as specified.");
 
         //--- Acquisition Frame Rate
+        //--- only set if it is enabled
         tmp_feature_name = "AcquisitionFrameRateEnable";
         RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
                      tmp_feature_name.c_str(), i);
@@ -828,17 +867,10 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             {
                 tmp_min_dbl = 0;
                 tmp_max_dbl = DBL_MAX;
-                arv_device_get_float_feature_bounds(p_device_, tmp_feature_name.c_str(),
-                                                    &tmp_min_dbl, &tmp_max_dbl, err.ref());
-                CHECK_GERROR_MSG(err, logger_,
-                                 "In getting bounds for feature '" + tmp_feature_name + "'.");
+                setBoundedFeatureValueFromParameter<double>(tmp_feature_name, tmp_param_value,
+                                                            &tmp_min_dbl, &tmp_max_dbl, i);
                 acq_ctrl.frame_rate_min = tmp_min_dbl;
                 acq_ctrl.frame_rate_max = tmp_max_dbl;
-
-                setBoundedFeatureValueFromParameter<double>(tmp_feature_name,
-                                                            acq_ctrl.frame_rate_min,
-                                                            acq_ctrl.frame_rate_max,
-                                                            tmp_param_value, i);
             }
             else
             {
@@ -863,6 +895,227 @@ bool CameraDriverGv::setUpCameraStreamStructs()
                      tmp_feature_name.c_str(), i);
         is_parameter_set = getAcquisitionControlParameterList(tmp_feature_name,
                                                               tmp_param_values);
+        if (is_parameter_set)
+            setFeatureValuesFromParameterList(tmp_param_values, i);
+    }
+
+    return true;
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::getAnalogControlParameter(
+  const std::string& param_name,
+  rclcpp::ParameterValue& param_value) const
+{
+    return getNestedParameter("AnalogControl", param_name, param_value);
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::getAnalogControlParameterList(
+  const std::string& param_name,
+  std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const
+{
+    return getNestedParameterList("AnalogControl", param_name, param_values);
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraDriverGv::setAnalogControlSettings()
+{
+    GuardedGError err;
+
+    for (uint i = 0; i < streams_.size(); ++i)
+    {
+        Stream& stream             = streams_[i];
+        AnalogControl& analog_ctrl = stream.analog_control;
+
+        std::string tmp_feature_name;
+        rclcpp::ParameterValue tmp_param_value;
+        std::vector<std::pair<std::string, rclcpp::ParameterValue>> tmp_param_values;
+
+        gdouble tmp_min_dbl, tmp_max_dbl, tmp_value_dbl;
+
+        bool is_parameter_set;
+
+        //--- set source, if applicable
+        if (streams_.size() > 1)
+        {
+            // TODO(boitumeloruf): make more source selector more generic
+            std::string src_selector_val = "Source" + std::to_string(i);
+            setFeatureValue<std::string>("SourceSelector", src_selector_val);
+        }
+
+        //--- get and set given custom features at beginning of analog control
+        tmp_feature_name = "BEGIN";
+        RCLCPP_DEBUG(logger_, "Evaluating 'AnalogControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getAnalogControlParameterList(tmp_feature_name,
+                                                         tmp_param_values);
+        if (is_parameter_set)
+            setFeatureValuesFromParameterList(tmp_param_values, i);
+
+        //--- for specific auto parameters, proceed as follows:
+        //---   1. Check and read parameter from launch parameters
+        //---   2. If provided in launch parameter, set value on device
+        //---   3. Get the set value from the device and store it in corresponding struct
+        //---   4. If specific parameter was given in the launch parameters, check against the
+        //---       actual value which has been read from the camera and issue a warning message
+        //---       if applicable
+        //---
+        //--- if corresponding auto modes are deactivated, proceed as follows to set specific
+        //--- values:
+        //---   1. get nested parameter list for corresponding feature
+        //---   2. parameter list will hold key-value pairs consisting of selector value and
+        //---       actual value
+        //---   3. thus, loop through nested parameter list
+        //---       a) use key to set value of selector
+        //---       b) set value to actual parameter by considering bounds
+        //---       c) get accepted value, store into struct, compare against given parameter,
+        //---           and issue warning message, if applicable
+
+        //--- Gain
+        tmp_feature_name = "GainAuto";
+        RCLCPP_DEBUG(logger_, "Evaluating 'AnalogControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getAnalogControlParameter(tmp_feature_name, tmp_param_value);
+        if (is_parameter_set)
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<std::string>(tmp_feature_name, analog_ctrl.gain_auto);
+        if (is_parameter_set &&
+            !isParameterValueEqualTo<std::string>(tmp_param_value, analog_ctrl.gain_auto, i))
+            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                        "'" + tmp_feature_name + "' is not as specified.");
+
+        if (arv_auto_from_string(analog_ctrl.gain_auto.c_str()) == ARV_AUTO_OFF)
+        {
+            tmp_feature_name = "Gain";
+            RCLCPP_DEBUG(logger_, "Evaluating 'AnalogControl.%s' for stream %i.",
+                         tmp_feature_name.c_str(), i);
+            is_parameter_set = getAnalogControlParameterList(tmp_feature_name,
+                                                             tmp_param_values);
+            if (is_parameter_set)
+            {
+                for (auto itr = tmp_param_values.begin(); itr != tmp_param_values.end(); ++itr)
+                {
+                    //--- set selector
+                    setFeatureValue<std::string>("GainSelector", itr->first);
+
+                    //--- set bounded feature
+                    setBoundedFeatureValueFromParameter<double>(tmp_feature_name.c_str(),
+                                                                itr->second,
+                                                                &tmp_min_dbl, &tmp_max_dbl, i);
+                    //--- get set value
+                    getFeatureValue<double>(tmp_feature_name, tmp_value_dbl);
+                    if (!isParameterValueEqualTo<double>(itr->second, tmp_value_dbl, i))
+                        config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                                    "'" + tmp_feature_name + "." + itr->first +
+                                                    "' is not as specified.");
+
+                    //--- store into struct
+                    analog_ctrl.gain.push_back(std::make_tuple(itr->first, tmp_value_dbl,
+                                                               tmp_min_dbl, tmp_max_dbl));
+                }
+            }
+        }
+
+        //--- Black Level
+        tmp_feature_name = "BlackLevelAuto";
+        RCLCPP_DEBUG(logger_, "Evaluating 'AnalogControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getAnalogControlParameter(tmp_feature_name, tmp_param_value);
+        if (is_parameter_set)
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<std::string>(tmp_feature_name, analog_ctrl.black_level_auto);
+        if (is_parameter_set &&
+            !isParameterValueEqualTo<std::string>(tmp_param_value, analog_ctrl.black_level_auto, i))
+            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                        "'" + tmp_feature_name + "' is not as specified.");
+
+        if (arv_auto_from_string(analog_ctrl.black_level_auto.c_str()) == ARV_AUTO_OFF)
+        {
+            tmp_feature_name = "BlackLevel";
+            RCLCPP_DEBUG(logger_, "Evaluating 'AnalogControl.%s' for stream %i.",
+                         tmp_feature_name.c_str(), i);
+            is_parameter_set = getAnalogControlParameterList(tmp_feature_name,
+                                                             tmp_param_values);
+            if (is_parameter_set)
+            {
+                for (auto itr = tmp_param_values.begin(); itr != tmp_param_values.end(); ++itr)
+                {
+                    //--- set selector
+                    setFeatureValue<std::string>("BlackLevelSelector", itr->first);
+
+                    //--- set bounded feature
+                    setBoundedFeatureValueFromParameter<double>(tmp_feature_name.c_str(),
+                                                                itr->second,
+                                                                &tmp_min_dbl, &tmp_max_dbl, i);
+
+                    //--- get set value
+                    getFeatureValue<double>(tmp_feature_name, tmp_value_dbl);
+                    if (!isParameterValueEqualTo<double>(itr->second, tmp_value_dbl, i))
+                        config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                                    "'" + tmp_feature_name + "." + itr->first +
+                                                    "' is not as specified.");
+
+                    //--- store into struct
+                    analog_ctrl.black_level.push_back(std::make_tuple(itr->first, tmp_value_dbl,
+                                                                      tmp_min_dbl, tmp_max_dbl));
+                }
+            }
+        }
+
+        //--- White Balance
+        tmp_feature_name = "BalanceWhiteAuto";
+        RCLCPP_DEBUG(logger_, "Evaluating 'AnalogControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getAnalogControlParameter(tmp_feature_name, tmp_param_value);
+        if (is_parameter_set)
+            setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
+        getFeatureValue<std::string>(tmp_feature_name, analog_ctrl.balance_white_auto);
+        if (is_parameter_set &&
+            !isParameterValueEqualTo<std::string>(tmp_param_value,
+                                                  analog_ctrl.balance_white_auto, i))
+            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                        "'" + tmp_feature_name + "' is not as specified.");
+
+        if (arv_auto_from_string(analog_ctrl.balance_white_auto.c_str()) == ARV_AUTO_OFF)
+        {
+            tmp_feature_name = "BalanceRatio";
+            RCLCPP_DEBUG(logger_, "Evaluating 'AnalogControl.%s' for stream %i.",
+                         tmp_feature_name.c_str(), i);
+            is_parameter_set = getAnalogControlParameterList(tmp_feature_name,
+                                                             tmp_param_values);
+            if (is_parameter_set)
+            {
+                for (auto itr = tmp_param_values.begin(); itr != tmp_param_values.end(); ++itr)
+                {
+                    //--- set selector
+                    setFeatureValue<std::string>("BalanceRatioSelector", itr->first);
+
+                    //--- set bounded feature
+                    setBoundedFeatureValueFromParameter<double>(tmp_feature_name.c_str(),
+                                                                itr->second,
+                                                                &tmp_min_dbl, &tmp_max_dbl, i);
+
+                    //--- get set value
+                    getFeatureValue<double>(tmp_feature_name, tmp_value_dbl);
+                    if (!isParameterValueEqualTo<double>(itr->second, tmp_value_dbl, i))
+                        config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
+                                                    "'" + tmp_feature_name + "." + itr->first +
+                                                    "' is not as specified.");
+
+                    //--- store into struct
+                    analog_ctrl.balance_ratio.push_back(std::make_tuple(itr->first, tmp_value_dbl,
+                                                                        tmp_min_dbl, tmp_max_dbl));
+                }
+            }
+        }
+
+        //--- get and set given custom features at end of analog control
+        tmp_feature_name = "END";
+        RCLCPP_DEBUG(logger_, "Evaluating 'AnalogControl.%s' for stream %i.",
+                     tmp_feature_name.c_str(), i);
+        is_parameter_set = getAnalogControlParameterList(tmp_feature_name,
+                                                         tmp_param_values);
         if (is_parameter_set)
             setFeatureValuesFromParameterList(tmp_param_values, i);
     }
@@ -1199,6 +1452,7 @@ void CameraDriverGv::fillCameraInfoMsg(Stream& stream,
 void CameraDriverGv::printCameraConfiguration() const
 {
     rclcpp::ParameterValue tmp_param_value;
+    std::vector<std::pair<std::string, rclcpp::ParameterValue>> tmp_param_values;
 
     RCLCPP_INFO(logger_, "======================================");
     RCLCPP_INFO(logger_, "Camera Configuration:");
@@ -1234,36 +1488,37 @@ void CameraDriverGv::printCameraConfiguration() const
 
     for (uint i = 0; i < streams_.size(); i++)
     {
-        const Stream& stream               = streams_[i];
-        const Sensor& sensor               = stream.sensor;
-        const ImageRoi& roi                = stream.image_roi;
-        const AcquisitionControl& acq_ctrl = stream.acquisition_control;
+        const Stream& STREAM               = streams_[i];
+        const Sensor& SENSOR               = STREAM.sensor;
+        const ImageRoi& ROI                = STREAM.image_roi;
+        const AcquisitionControl& ACQ_CTRL = STREAM.acquisition_control;
+        const AnalogControl& ANALOG_CTRL   = STREAM.analog_control;
 
         RCLCPP_INFO(logger_, "  - - - - - - - - - - - - - - - - - - ");
-        RCLCPP_INFO(logger_, "  Stream %i:              %s", i, stream.name.c_str());
+        RCLCPP_INFO(logger_, "  Stream %i:              %s", i, STREAM.name.c_str());
 
         if (is_verbose_enable_)
         {
-            RCLCPP_INFO(logger_, "    Camera Info:         %s", stream.camera_info_url.c_str());
+            RCLCPP_INFO(logger_, "    Camera Info:         %s", STREAM.camera_info_url.c_str());
             RCLCPP_INFO(logger_, "    Topic:               %s",
-                        stream.camera_pub.getTopic().c_str());
-            RCLCPP_INFO(logger_, "    Frame ID:            %s", sensor.frame_id.c_str());
+                        STREAM.camera_pub.getTopic().c_str());
+            RCLCPP_INFO(logger_, "    Frame ID:            %s", SENSOR.frame_id.c_str());
         }
 
-        RCLCPP_INFO(logger_, "    Sensor Size:         %ix%i", sensor.width, sensor.height);
+        RCLCPP_INFO(logger_, "    Sensor Size:         %ix%i", SENSOR.width, SENSOR.height);
 
-        RCLCPP_INFO(logger_, "    Pixel Format:        %s", sensor.pixel_format.c_str());
+        RCLCPP_INFO(logger_, "    Pixel Format:        %s", SENSOR.pixel_format.c_str());
 
         if (is_verbose_enable_)
             RCLCPP_INFO(logger_, "    Bits/Pixel:          %i",
-                        static_cast<int>(sensor.n_bits_pixel));
+                        static_cast<int>(SENSOR.n_bits_pixel));
 
         if (getImageFormatControlParameter("ReverseX", tmp_param_value) ||
             getImageFormatControlParameter("ReverseY", tmp_param_value) ||
             is_verbose_enable_)
             RCLCPP_INFO(logger_, "    Reverse X,Y:         %s,%s",
-                        (sensor.reverse_x) ? "True" : "False",
-                        (sensor.reverse_y) ? "True" : "False");
+                        (SENSOR.reverse_x) ? "True" : "False",
+                        (SENSOR.reverse_y) ? "True" : "False");
 
         if (getImageFormatControlParameter("BinningHorizontal", tmp_param_value) ||
             getImageFormatControlParameter("BinningHorizontalMode", tmp_param_value) ||
@@ -1272,51 +1527,121 @@ void CameraDriverGv::printCameraConfiguration() const
             is_verbose_enable_)
         {
             RCLCPP_INFO(logger_, "    Binning X,Y:         %i,%i",
-                        sensor.binning_x, sensor.binning_y);
+                        SENSOR.binning_x, SENSOR.binning_y);
             RCLCPP_INFO(logger_, "    Binning Mode X,Y:    %s,%s",
-                        sensor.binning_mode_x.c_str(), sensor.binning_mode_y.c_str());
+                        SENSOR.binning_mode_x.c_str(), SENSOR.binning_mode_y.c_str());
         }
 
         if (getImageFormatControlParameter("OffsetX", tmp_param_value) ||
             getImageFormatControlParameter("OffsetY", tmp_param_value) ||
             is_verbose_enable_)
-            RCLCPP_INFO(logger_, "    Image Offset X,Y:    %i,%i", roi.x, roi.y);
+            RCLCPP_INFO(logger_, "    Image Offset X,Y:    %i,%i", ROI.x, ROI.y);
 
-        RCLCPP_INFO(logger_, "    Image Size:          %ix%i", roi.width, roi.height);
+        RCLCPP_INFO(logger_, "    Image Size:          %ix%i", ROI.width, ROI.height);
         if (is_verbose_enable_)
             RCLCPP_INFO(logger_, "    Image Width Bound:   [%i,%i]",
-                        roi.width_min, roi.width_max);
+                        ROI.width_min, ROI.width_max);
         if (is_verbose_enable_)
             RCLCPP_INFO(logger_, "    Image Height Bound:  [%i,%i]",
-                        roi.height_min, roi.height_max);
+                        ROI.height_min, ROI.height_max);
 
-        RCLCPP_INFO(logger_, "    Acquisition Mode:    %s", acq_ctrl.acquisition_mode.c_str());
+        RCLCPP_INFO(logger_, "    Acquisition Mode:    %s", ACQ_CTRL.acquisition_mode.c_str());
 
         if (getAcquisitionControlParameter("AcquisitionFrameCount", tmp_param_value) ||
-            arv_acquisition_mode_from_string(acq_ctrl.acquisition_mode.c_str()) ==
+            arv_acquisition_mode_from_string(ACQ_CTRL.acquisition_mode.c_str()) ==
               ARV_ACQUISITION_MODE_MULTI_FRAME ||
             is_verbose_enable_)
-            RCLCPP_INFO(logger_, "    Frame Count:         %i", acq_ctrl.frame_count);
+            RCLCPP_INFO(logger_, "    Frame Count:         %i", ACQ_CTRL.frame_count);
 
-        RCLCPP_INFO(logger_, "    Exposure Mode:       %s", acq_ctrl.exposure_mode.c_str());
+        RCLCPP_INFO(logger_, "    Exposure Mode:       %s", ACQ_CTRL.exposure_mode.c_str());
 
-        RCLCPP_INFO(logger_, "    Exposure Auto:       %s", acq_ctrl.exposure_auto.c_str());
+        RCLCPP_INFO(logger_, "    Exposure Auto:       %s", ACQ_CTRL.exposure_auto.c_str());
 
-        if ((arv_auto_from_string(acq_ctrl.exposure_auto.c_str()) ==
+        if ((arv_auto_from_string(ACQ_CTRL.exposure_auto.c_str()) ==
                ARV_AUTO_OFF &&
-             arv_exposure_mode_from_string(acq_ctrl.exposure_mode.c_str()) ==
+             arv_exposure_mode_from_string(ACQ_CTRL.exposure_mode.c_str()) ==
                ARV_EXPOSURE_MODE_TIMED) ||
             is_verbose_enable_)
-            RCLCPP_INFO(logger_, "    Exposure Time (us):  %f", acq_ctrl.exposure_time);
+            RCLCPP_INFO(logger_, "    Exposure Time (us):  %f", ACQ_CTRL.exposure_time);
 
         RCLCPP_INFO(logger_, "    Frame Rate Enable:   %s",
-                    (acq_ctrl.is_frame_rate_enable) ? "True" : "False");
+                    (ACQ_CTRL.is_frame_rate_enable) ? "True" : "False");
 
-        RCLCPP_INFO(logger_, "    Frame Rate (Hz):     %f", acq_ctrl.frame_rate);
+        RCLCPP_INFO(logger_, "    Frame Rate (Hz):     %f", ACQ_CTRL.frame_rate);
 
         if (is_verbose_enable_)
             RCLCPP_INFO(logger_, "    Frame Rate Bound:    [%f,%f]",
-                        acq_ctrl.frame_rate_min, acq_ctrl.frame_rate_max);
+                        ACQ_CTRL.frame_rate_min, ACQ_CTRL.frame_rate_max);
+
+        if (getAnalogControlParameter("GainAuto", tmp_param_value) ||
+            is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Gain Auto:           %s", ANALOG_CTRL.gain_auto.c_str());
+
+        if (arv_auto_from_string(ANALOG_CTRL.gain_auto.c_str()) == ARV_AUTO_OFF &&
+            (getAnalogControlParameterList("Gain", tmp_param_values) ||
+             is_verbose_enable_))
+        {
+            for (auto itr = ANALOG_CTRL.gain.begin(); itr != ANALOG_CTRL.gain.end(); ++itr)
+            {
+                if (itr == ANALOG_CTRL.gain.begin())
+                    RCLCPP_INFO(logger_, "    Gain:                %f (%s)", std::get<1>(*itr),
+                                std::get<0>(*itr).c_str());
+                else
+                    RCLCPP_INFO(logger_, "                         %f (%s)", std::get<1>(*itr),
+                                std::get<0>(*itr).c_str());
+                if (is_verbose_enable_)
+                    RCLCPP_INFO(logger_, "                         [%f,%f]", std::get<2>(*itr),
+                                std::get<3>(*itr));
+            }
+        }
+
+        if (getAnalogControlParameter("BlackLevelAuto", tmp_param_value) ||
+            is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Black Level Auto:    %s",
+                        ANALOG_CTRL.black_level_auto.c_str());
+
+        if (arv_auto_from_string(ANALOG_CTRL.black_level_auto.c_str()) == ARV_AUTO_OFF &&
+            (getAnalogControlParameterList("BlackLevel", tmp_param_values) ||
+             is_verbose_enable_))
+        {
+            for (auto itr = ANALOG_CTRL.black_level.begin(); itr != ANALOG_CTRL.black_level.end();
+                 ++itr)
+            {
+                if (itr == ANALOG_CTRL.black_level.begin())
+                    RCLCPP_INFO(logger_, "    Black Level:         %f (%s)", std::get<1>(*itr),
+                                std::get<0>(*itr).c_str());
+                else
+                    RCLCPP_INFO(logger_, "                         %f (%s)", std::get<1>(*itr),
+                                std::get<0>(*itr).c_str());
+                if (is_verbose_enable_)
+                    RCLCPP_INFO(logger_, "                         [%f,%f]", std::get<2>(*itr),
+                                std::get<3>(*itr));
+            }
+        }
+
+        if (getAnalogControlParameter("BalanceWhiteAuto", tmp_param_value) ||
+            is_verbose_enable_)
+            RCLCPP_INFO(logger_, "    Balance White Auto:  %s",
+                        ANALOG_CTRL.balance_white_auto.c_str());
+
+        if (arv_auto_from_string(ANALOG_CTRL.balance_white_auto.c_str()) == ARV_AUTO_OFF &&
+            (getAnalogControlParameterList("BalanceRatio", tmp_param_values) ||
+             is_verbose_enable_))
+        {
+            for (auto itr = ANALOG_CTRL.balance_ratio.begin();
+                 itr != ANALOG_CTRL.balance_ratio.end(); ++itr)
+            {
+                if (itr == ANALOG_CTRL.balance_ratio.begin())
+                    RCLCPP_INFO(logger_, "    Balance Ratio:       %f (%s)", std::get<1>(*itr),
+                                std::get<0>(*itr).c_str());
+                else
+                    RCLCPP_INFO(logger_, "                         %f (%s)", std::get<1>(*itr),
+                                std::get<0>(*itr).c_str());
+                if (is_verbose_enable_)
+                    RCLCPP_INFO(logger_, "                         [%f,%f]", std::get<2>(*itr),
+                                std::get<3>(*itr));
+            }
+        }
     }
 
     RCLCPP_INFO(logger_, "======================================");

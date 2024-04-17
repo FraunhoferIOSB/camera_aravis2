@@ -99,6 +99,9 @@ class CameraDriverGv : public CameraAravisNodeBase
         /// Control settings for image acquisition.
         AcquisitionControl acquisition_control;
 
+        /// Control settings for analog control.
+        AnalogControl analog_control;
+
         /// URL to camera info yaml file.
         std::string camera_info_url;
 
@@ -294,6 +297,41 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @return True if successful. False, otherwise.
      */
     [[nodiscard]] bool setAcquisitionControlSettings();
+
+    /**
+     * @brief Get parameter with 'parameter_name' within the list of analog control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within analog control.
+     * The method will prepend 'AnalogControl.' to the parameter prior to the search.
+     * @param[out] param_value Parameter value.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getAnalogControlParameter(
+      const std::string& param_name,
+      rclcpp::ParameterValue& param_value) const;
+
+    /**
+     * @brief Get list of parameters underneath 'param_name' within the list of analog control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within analog control.
+     * The method will prepend 'AnalogControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getAnalogControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
+
+    /**
+     * @brief Set analog control settings of the camera.
+     *
+     * @return True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool setAnalogControlSettings();
 
     /**
      * @brief Discover number of available camera streams.

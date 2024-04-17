@@ -159,6 +159,39 @@ class CameraAravisNodeBase : public rclcpp::Node
     bool setFeatureValue(const std::string& feature_name, const T& value) const;
 
     /**
+     * @overload
+     * @brief Set feature value if it is available.
+     *
+     * This will truncate the value at the given minimum and maximum bound prior to setting.
+     *
+     * @tparam T Type of feature value.
+     * @param[in] feature_name Name of feature.
+     * @param[in] value Value to set.
+     * @param[in] min Minimum bound of the value that is to be set.
+     * @param[in] max Maximum bound of the value that is to be set.
+     * @return Returns true if successful, false otherwise.
+     */
+    template <typename T>
+    bool setFeatureValue(const std::string& feature_name, const T& value,
+                         const T& min, const T& max) const;
+
+    /**
+     * @brief Set bounded feature value if it is available.
+     *
+     * This will first get the bounds and then truncate the value accordingly before setting it.
+     *
+     * @tparam T Type of feature value.
+     * @param[in] feature_name Name of feature.
+     * @param[in] value Value to set.
+     * @param[out] min Optional pointer to variable in which to store minimum bound.
+     * @param[out] max Optional pointer to variable in which to store maximum bound.
+     * @return Returns true if successful, false otherwise.
+     */
+    template <typename T>
+    bool setBoundedFeatureValue(const std::string& feature_name, const T& value,
+                                T* min = nullptr, T* max = nullptr) const;
+
+    /**
      * @brief Set feature from parameter value if it is available.
      *
      * This will first check if the parameter is an array type. If so, it will use 'idx' to access
@@ -174,6 +207,30 @@ class CameraAravisNodeBase : public rclcpp::Node
     template <typename T>
     bool setFeatureValueFromParameter(const std::string& feature_name,
                                       const rclcpp::ParameterValue& parameter_value,
+                                      const uint& idx = 0) const;
+
+    /**
+     * @overload
+     * @brief Set feature from parameter value if it is available.
+     *
+     * This will first check if the parameter is an array type. If so, it will use 'idx' to access
+     * the parameter. If the given index outside of the range, the last value of the list is used.
+     *
+     * This will also truncate the value at the given minimum and maximum bound prior to setting.
+     *
+     * @tparam T Type of feature value.
+     * @param[in] feature_name Name of feature.
+     * @param[in] parameter_value Specified parameter values.
+     * @param[in] min Minimum bound of the value that is to be set.
+     * @param[in] max Maximum bound of the value that is to be set.
+     * @param[in] idx Index of parameter value that is to be set. Only used if parameter values are
+     * given as array.
+     * @return Returns true if successful, false otherwise.
+     */
+    template <typename T>
+    bool setFeatureValueFromParameter(const std::string& feature_name,
+                                      const rclcpp::ParameterValue& parameter_value,
+                                      const T& min, const T& max,
                                       const uint& idx = 0) const;
 
     /**
@@ -202,17 +259,17 @@ class CameraAravisNodeBase : public rclcpp::Node
      *
      * @tparam T Type of feature value.
      * @param[in] feature_name Name of feature.
-     * @param[in] min Minimum bound.
-     * @param[in] max Maximum bound.
      * @param[in] parameter_value Specified parameter values.
+     * @param[out] min Optional pointer to variable in which to store minimum bound.
+     * @param[out] max Optional pointer to variable in which to store maximum bound.
      * @param[in] idx Index of parameter value that is to be set. Only used if parameter values are
      * given as array.
      * @return Returns true if successful, false otherwise.
      */
     template <typename T>
     bool setBoundedFeatureValueFromParameter(const std::string& feature_name,
-                                             const T& min, const T& max,
                                              const rclcpp::ParameterValue& parameter_value,
+                                             T* min = nullptr, T* max = nullptr,
                                              const uint& idx = 0) const;
 
     /**

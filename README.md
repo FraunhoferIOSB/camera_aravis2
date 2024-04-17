@@ -29,6 +29,9 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
     - [Requirements](#requirements)
     - [Build](#build)
     - [Test](#test)
+- [FAQ](#faq)
+    - [How to use PTP](#how-to-use-ptp)
+    - [How to set specific analog control values (e.g. balance ratios)](#how-to-set-specific-analog-control-values-eg-balance-ratios)
 - [Known Issues](#known-issues)
 
 ------------------------
@@ -69,16 +72,16 @@ The SNFC groups the individual features into numerous catagories (e.g. Image For
 Camera_aravis2 explicitly looks for a number of features in a couple of categories to be specified and tries to set the features accordingly. 
 If specified as launch parameter, camera_aravis2 will set the following features in the same order as listed below:
 
-- `DeviceControl`: List of GenICam parameters of the 'DeviceControl' category that are to be set. Here, no specific order is implemented. Nested parameter list is evaluated in alphabetical order.
+- `DeviceControl` (List): GenICam parameters of the 'DeviceControl' category that are to be set. Here, no specific order is implemented. Nested parameter list is evaluated in alphabetical order.
 - `TransportLayerControl`
-    - `BEGIN`: List of additional GenICam parameters that are not be set at the beginning of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
     - `GevSCPSPacketSize` (Int): Specifies the packet size, in bytes, which are to be send. This should correspond 'DeviceStreamChannelPacketSize' and the maximum transport unit (MTU) of the interface.
     - `GevSCPD` (Int): Controls the delay (in GEV timestamp counter unit) to insert between
 each packet for this stream channel.
     - `PtpEnable` (Bool): Enables the Precision Time Protocol (PTP).
-    - `END`: List of additional GenICam parameters that are not be set at the end of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `END` (List): Additional GenICam parameters that are not be set at the end of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
 - `ImageFormatControl`
-    - `BEGIN`: List of additional GenICam parameters that are not be set at the beginning of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
     - `PixelFormat`* (String): Format of the pixels provided by the device.
     - `ReverseX`* (Bool): Flip horizontally the image sent by the device.
     - `ReverseY`* (Bool): Flip vertically the image sent by the device.
@@ -90,9 +93,9 @@ each packet for this stream channel.
     - `Height`* (Int): Height of the image provided by the device (in pixels).
     - `OffsetX`* (Int): Horizontal offset from the origin to the region of interest (in pixels).
     - `OffsetY`* (Int): Vertical offset from the origin to the region of interest (in pixels).
-    - `END`: List of additional GenICam parameters that are not be set at the end of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `END` (List): Additional GenICam parameters that are not be set at the end of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
 - `AcquisitionControl`
-    - `BEGIN`: List of additional GenICam parameters that are not be set at the beginning of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
     - `AcquisitionMode`* (String): Sets the acquisition mode of the device. Values possible: 'SingleFrame', 'MultiFrame', or 'Continuous'.
     - `AcquisitionFrameCount`* (Int): Number of frames to acquire in MultiFrame Acquisition mode. Only evaluated if 'AcquisitionMode' is 'MultiFrame'.
     - `ExposureMode`* (String): Sets the operation mode of the Exposure. Values possible: 'Off', 'Timed', 'TriggerWidth', or 'TriggerControlled'.
@@ -100,7 +103,16 @@ each packet for this stream channel.
     - `ExposureTime`* (Double): Sets the Exposure time when 'ExposureMode' is 'Timed' and 'ExposureAuto' is 'Off'.
     - `AcquisitionFrameRateEnable`* (Bool): Controls if the AcquisitionFrameRate feature is writable and used to control the acquisition rate.
     - `AcquisitionFrameRate`* (Double): Controls the acquisition rate (in Hertz) at which the frames are captured.
-    - `END`: List of additional GenICam parameters that are not be set at the end of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `END` (List): Additional GenICam parameters that are not be set at the end of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
+- `AnalogControl`
+    - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `GainAuto`* (String): Sets the automatic gain control mode. Values possible: 'Off', 'Once', or 'Continuous'.
+    - `Gain`* (List): Key-Value pairs of type string (key) and double (value) to set specific gain values in case 'GainAuto' is set to 'Off'. In this, the key will be set as value to the 'GainSelector' and the value will be set to the 'Gain' feature. The list is evaluated in alphabetical order.
+    - `BlackLevelAuto`* (String): Controls the mode for automatic black level adjustment. Values possible: 'Off', 'Once', or 'Continuous'.
+    - `BlackLevel`* (List): Key-Value pairs of type string (key) and double (value) to set specific black level values in case 'BlackLevelAuto' is set to 'Off'. In this, the key will be set as value to the 'BlackLevelSelector' and the value will be set to the 'BlackLevel' feature. The list is evaluated in alphabetical order.
+    - `BalanceWhiteAuto`* (String): Controls the mode for automatic black level adjustment. Values possible: 'Off', 'Once', or 'Continuous'.
+    - `BalanceRatio`* (List): Key-Value pairs of type string (key) and double (value) to set specific balance ratio values in case 'BalanceWhiteAuto' is set to 'Off'. In this, the key will be set as value to the 'BalanceRatioSelector' and the value will be set to the 'BalanceRatio' feature. The list is evaluated in alphabetical order.
+    - `END` (List): Additional GenICam parameters that are not be set at the end of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
 
 In the sections where a certain order of predefined parameters is considered and implemented, the user can specify a list of additional GenICam parameters nested underneath the parameter `BEGIN` and `END`, respectively, which are not explicitly evaluated as part of the list above. 
 This allows for the user to specify parameters which are not known to camera_aravis2. 
@@ -149,6 +161,14 @@ While the parameters are evaluated by camera_aravis2 in the specific order which
                         "ExposureMode": "Timed",
                         "ExposureAuto": "Continuous",
                         "AcquisitionFrameRate": 30.0
+                    },
+                    "AnalogControl": {
+                        "GainAuto": "Continuous",
+                        "BalanceWhiteAuto": "Off",
+                        "BalanceRatio": {
+                            "Red": 1.6,
+                            "Blue": 2.0
+                        }
                     }
                 }]
     ...
@@ -259,6 +279,56 @@ To run tests after build, additionally call:
 colcon test --event-handlers=console_direct+
 colcon test-result --all
 
+```
+
+## FAQ
+
+### How to use PTP
+
+Some cameras support the use of the Precision Time Protocol (PTP) to set the timestamps of the captured images. To activate and use it just set the launch parameter 'TransportLayerControl.PtpEnable' to 'True' as seen blow:
+
+```Python
+    ...
+    parameters=[{
+                    ...
+                    "TransportLayerControl": {
+                        "PtpEnable": True
+                    }
+                    ...
+                }]
+    ...
+```
+
+### How to set specific analog control values (e.g. balance ratios)
+
+Typically GenICam cameras support three different modes for automatic control of analog settings (e.g. gain, black level, white balance), namely 'Continuous', 'Once', and 'Off'. These can be set via the launch parameter and corresponding feature names, i.e. 'GainAuto', 'BlackLevelAuto', 'BalanceWhiteAuto'. As the names suggest, the first mode will continuously adjust the white 
+balance, while the second mode will measure the white balance once and then freeze the ratio
+parameters. In case, of the third mode, the ratios of the different color channels can and need to be set manually.
+
+Use the launch parameters of camera_aravis2 to manually set the ratio parameters and configure the analog control, by
+
+- setting the corresponding auto feature to 'Off',
+- and providing a list of key-value pairs of type string (key) and double (value) for the corresponding feature. 
+
+In this, the key will be set as value to the corresponding selector (e.g. 'GainSelector', 'BalanceRatioSelector') and the value will be set to the feature.
+
+For example:
+
+```Python
+    ...
+    parameters=[{
+                    ...
+                    "AnalogControl": {
+                        "GainAuto": "Continuous",
+                        "BalanceWhiteAuto": "Off",
+                        "BalanceRatio": {
+                            "Red": 1.6,
+                            "Blue": 2.0
+                        }
+                    }
+                    ...
+                }]
+    ...
 ```
 
 ## Known Issues
