@@ -1426,23 +1426,27 @@ void CameraDriverGv::fillCameraInfoMsg(Stream& stream,
     if (!stream.p_cam_info_msg)
     {
         stream.p_cam_info_msg.reset(new sensor_msgs::msg::CameraInfo());
+
+        //--- fill camera data only once
+        (*stream.p_cam_info_msg) = stream.p_camera_info_manager->getCameraInfo();
     }
 
-    //--- fill data
-    (*stream.p_cam_info_msg)      = stream.p_camera_info_manager->getCameraInfo();
+    //--- fill header data each time an image gets published
     stream.p_cam_info_msg->header = p_img_msg->header;
 
-    // TODO: Revise check of image_width and image_height
+    //--- check if image size given in camera info corresponds to actual image size.
     if (stream.p_camera_info_manager->isCalibrated() &&
-        (stream.p_cam_info_msg->width == 0 || stream.p_cam_info_msg->height == 0))
+        (stream.p_cam_info_msg->width != p_img_msg->width ||
+         stream.p_cam_info_msg->height != p_img_msg->height))
     {
         RCLCPP_WARN_ONCE(
           logger_,
-          "The fields image_width and image_height in the YAML specified by 'camera_info_url' "
-          "parameter seams to be inconsistent with the actual image size. Please set them there, "
+          "The fields image_width and image_height (%ix%i) in the YAML specified by 'camera_info_url' "
+          "parameter seams to be inconsistent with the actual image size (%ix%i). Please set them there, "
           "because actual image size and specified image size can be different due to the "
           "region of interest (ROI) feature. In the YAML the image size should be the one on which "
-          "the camera was calibrated. See CameraInfo.msg specification!");
+          "the camera was calibrated. See CameraInfo.msg specification!",
+          stream.p_cam_info_msg->width, stream.p_cam_info_msg->height, p_img_msg->width, p_img_msg->height);
         stream.p_cam_info_msg->width  = p_img_msg->width;
         stream.p_cam_info_msg->height = p_img_msg->height;
     }
