@@ -33,6 +33,9 @@
 #include <iostream>
 #include <thread>
 
+// ROS
+#include <rclcpp/time.hpp>
+
 // camera_aravis2
 #include "camera_aravis2/conversion_utils.h"
 #include "camera_aravis2/error.h"
@@ -50,7 +53,9 @@ namespace camera_aravis2
 //==================================================================================================
 CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
   CameraAravisNodeBase("camera_driver_gv", options),
-  is_spawning_(false)
+  is_spawning_(false),
+  is_diagnostics_published_(false),
+  p_diagnostic_pub_(nullptr)
 {
     //--- setup parameters
     setUpParameters();
@@ -88,6 +93,9 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     //--- set analog control settings
     ASSERT_SUCCESS(setAnalogControlSettings());
 
+    //--- laod diagnostics
+    setUpCameraDiagnosticPublisher();
+
     //--- check ptp
     if (tl_control_.is_ptp_enable)
         checkPtp();
@@ -122,6 +130,13 @@ CameraDriverGv::~CameraDriverGv()
     is_spawning_ = false;
     if (spawn_stream_thread_.joinable())
         spawn_stream_thread_.join();
+
+    //--- join diagnostic thread
+    is_diagnostics_published_ = false;
+    if (diagnostic_thread_.joinable())
+    {
+        diagnostic_thread_.join();
+    }
 
     //--- join buffer threads
     for (uint i = 0; i < streams_.size(); i++)
@@ -195,6 +210,18 @@ void CameraDriverGv::setUpParameters()
       "stream name is appended, together with '_' as separator. If no "
       "frame ID is specified, the name of the node will be used.";
     declare_parameter<std::string>("frame_id", "", frame_id_desc);
+
+    auto diag_yaml_url_desc = rcl_interfaces::msg::ParameterDescriptor{};
+    diag_yaml_url_desc.description =
+      "URL to yaml file specifying the camera features which are to be monitored. If left "
+      "empty (as default) no diagnostic features will be read and published.";
+    declare_parameter<std::string>("diagnostic_yaml_url", "",
+                                   diag_yaml_url_desc);
+
+    auto diag_pub_rate_desc = rcl_interfaces::msg::ParameterDescriptor{};
+    diag_pub_rate_desc.description =
+      "Rate at which to read and publish the diagnostic data.";
+    declare_parameter<double>("diagnostic_publishing_rate", 0.1, diag_pub_rate_desc);
 
     auto verbose_desc = rcl_interfaces::msg::ParameterDescriptor{};
     verbose_desc.description =
@@ -1294,6 +1321,247 @@ void CameraDriverGv::tuneGvStream(ArvGvStream* p_stream) const
 }
 
 //==================================================================================================
+void CameraDriverGv::setUpCameraDiagnosticPublisher()
+{
+    //--- get diagnostic settings
+    auto diagnostic_yaml_url_     = get_parameter("diagnostic_yaml_url").as_string();
+    auto diagnostic_publish_rate_ = get_parameter("diagnostic_publishing_rate").as_double();
+
+    //--- read diagnostic features from yaml file and initialize publishing thread
+    if (!diagnostic_yaml_url_.empty() && diagnostic_publish_rate_ > 0.0)
+    {
+        try
+        {
+            diagnostic_features_ = YAML::LoadFile(diagnostic_yaml_url_);
+        }
+        catch (const YAML::BadFile& e)
+        {
+            config_warn_msgs_.push_back("YAML file cannot be loaded: " + std::string(e.what()));
+            config_warn_msgs_.push_back("Camera diagnostics will not be published.");
+            return;
+        }
+        catch (const YAML::ParserException& e)
+        {
+            config_warn_msgs_.push_back("YAML file is malformed: " + std::string(e.what()));
+            config_warn_msgs_.push_back("Camera diagnostics will not be published.");
+            return;
+        }
+
+        //--- if diagnostic features are available, create publisher and initialize thread
+        if (diagnostic_features_.size() > 0)
+        {
+            p_diagnostic_pub_ =
+              this->create_publisher<camera_aravis2_msgs::msg::CameraDiagnostics>(
+                "~/diagnostics", 1);
+
+            is_diagnostics_published_ = true;
+            diagnostic_thread_ =
+              std::thread(&CameraDriverGv::publishCameraDiagnosticsLoop, this,
+                          diagnostic_publish_rate_);
+        }
+        else
+        {
+            config_warn_msgs_.push_back("No diagnostic features specified.");
+            config_warn_msgs_.push_back("Camera diagnostics will not be published.");
+            return;
+        }
+    }
+    else if (!diagnostic_yaml_url_.empty() && diagnostic_publish_rate_ <= 0.0)
+    {
+        config_warn_msgs_.push_back("Diagnostic_publish_rate is <= 0.0");
+        config_warn_msgs_.push_back("Camera diagnostics will not be published.");
+        return;
+    }
+}
+
+//==================================================================================================
+void CameraDriverGv::publishCameraDiagnosticsLoop(double rate) const
+{
+    RCLCPP_WARN(logger_, "Publishing camera diagnostics at %g Hz", rate);
+
+    camera_aravis2_msgs::msg::CameraDiagnostics cam_diagnostic_msg;
+    cam_diagnostic_msg.header.frame_id = this->get_name();
+
+    // function to get feature value at given name and of given type as string
+    auto getFeatureValueAsStrFn = [&](const std::string& name, const std::string& type)
+      -> std::string
+    {
+        std::string value_str = "";
+
+        if (type == "float")
+        {
+            float float_val;
+            getFeatureValue<float>(name, float_val);
+            value_str = std::to_string(float_val);
+        }
+        else if (type == "int")
+        {
+            int int_val;
+            getFeatureValue<int>(name, int_val);
+            value_str = std::to_string(int_val);
+        }
+        else if (type == "bool")
+        {
+            bool bool_val;
+            getFeatureValue<bool>(name, bool_val);
+            value_str = (bool_val) ? "true" : "false";
+        }
+        else
+        {
+            getFeatureValue<std::string>(name, value_str);
+        }
+
+        return value_str;
+    };
+
+    // function to set feature value at given name and of given type from string
+    auto setFeatureValueFromStrFn = [&](const std::string& name, const std::string& type,
+                                        const std::string& value_str)
+    {
+        if (type == "float")
+            setFeatureValue<float>(name, std::stod(value_str));
+        else if (type == "int")
+            setFeatureValue<int>(name, std::stoi(value_str));
+        else if (type == "bool")
+            setFeatureValue<bool>(name,
+                                  (value_str == "true" ||
+                                   value_str == "True" ||
+                                   value_str == "TRUE"));
+        else
+            setFeatureValue<std::string>(name, value_str);
+    };
+
+    // function to check if feature is available
+    auto isFeatureAvailableFn = [&](const std::string& name) -> bool
+    {
+        bool is_successful = true;
+        GuardedGError err;
+        bool is_feature_available =
+          arv_device_is_feature_available(p_device_, name.c_str(), err.ref());
+        ASSERT_GERROR(err, logger_, is_successful)
+
+        return (is_feature_available && is_successful);
+    };
+
+    while (rclcpp::ok() && is_diagnostics_published_)
+    {
+        cam_diagnostic_msg.header.stamp = this->get_clock()->now();
+
+        cam_diagnostic_msg.data.clear();
+
+        int feature_idx = 1;
+        for (auto feature_dict : diagnostic_features_)
+        {
+            std::string feature_name = feature_dict["FeatureName"].IsDefined()
+                                         ? feature_dict["FeatureName"].as<std::string>()
+                                         : "";
+            std::string feature_type = feature_dict["Type"].IsDefined()
+                                         ? feature_dict["Type"].as<std::string>()
+                                         : "";
+
+            if (feature_name.empty() || feature_type.empty())
+            {
+                RCLCPP_WARN_ONCE(logger_,
+                                 "Diagnostic feature at index %i does not have a field "
+                                 "'FeatureName' or 'Type'.",
+                                 feature_idx);
+                RCLCPP_WARN_ONCE(logger_, "Diagnostic feature will be skipped.");
+            }
+            else
+            {
+                // convert type string to lower case
+                std::transform(feature_type.begin(), feature_type.end(), feature_type.begin(),
+                               [](unsigned char c)
+                               { return std::tolower(c); });
+
+                // if feature name is found in implemented_feature list and if enabled
+                if (isFeatureAvailableFn(feature_name))
+                {
+                    diagnostic_msgs::msg::KeyValue kv_pair;
+
+                    // if 'selectors' which correspond to the feature_name are defined
+                    if (feature_dict["Selectors"].IsDefined() &&
+                        feature_dict["Selectors"].size() > 0)
+                    {
+                        int selectorIdx = 1;
+                        for (auto selector_dict : feature_dict["Selectors"])
+                        {
+                            std::string selector_feature_name =
+                              selector_dict["FeatureName"].IsDefined()
+                                ? selector_dict["FeatureName"].as<std::string>()
+                                : "";
+                            std::string selector_type =
+                              selector_dict["Type"].IsDefined()
+                                ? selector_dict["Type"].as<std::string>()
+                                : "";
+                            std::string selector_value =
+                              selector_dict["Value"].IsDefined()
+                                ? selector_dict["Value"].as<std::string>()
+                                : "";
+
+                            if (selector_feature_name.empty() ||
+                                selector_type.empty() ||
+                                selector_value.empty())
+                            {
+                                RCLCPP_WARN_ONCE(logger_,
+                                                 "Diagnostic feature selector at index %i of "
+                                                 "feature at index %i does not have a "
+                                                 "field 'FeatureName', 'Type' or 'Value'.",
+                                                 selectorIdx, feature_idx);
+                                RCLCPP_WARN_ONCE(logger_, "Diagnostic feature will be skipped.");
+                            }
+                            else
+                            {
+                                if (isFeatureAvailableFn(selector_feature_name))
+                                {
+                                    setFeatureValueFromStrFn(selector_feature_name, selector_type,
+                                                             selector_value);
+
+                                    kv_pair.key   = feature_name + "-" + selector_value;
+                                    kv_pair.value = getFeatureValueAsStrFn(feature_name,
+                                                                           feature_type);
+
+                                    cam_diagnostic_msg.data.push_back(
+                                      diagnostic_msgs::msg::KeyValue(kv_pair));
+                                }
+                                else
+                                {
+                                    RCLCPP_WARN_ONCE(logger_,
+                                                     "Diagnostic feature selector with "
+                                                     "name '%s' is not implemented.",
+                                                     selector_feature_name.c_str());
+                                }
+
+                                selectorIdx++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        kv_pair.key   = feature_name;
+                        kv_pair.value = getFeatureValueAsStrFn(feature_name, feature_type);
+
+                        cam_diagnostic_msg.data.push_back(diagnostic_msgs::msg::KeyValue(kv_pair));
+                    }
+                }
+                else
+                {
+                    RCLCPP_WARN_ONCE(logger_,
+                                     "Diagnostic feature with name '%s' is not implemented.",
+                                     feature_name.c_str());
+                }
+            }
+
+            feature_idx++;
+        }
+
+        p_diagnostic_pub_->publish(cam_diagnostic_msg);
+
+        rclcpp::sleep_for(std::chrono::nanoseconds(static_cast<int64_t>(std::pow(10, 9) / rate)));
+    }
+}
+
+//==================================================================================================
 void CameraDriverGv::checkPtp()
 {
     //--- get status
@@ -1441,12 +1709,14 @@ void CameraDriverGv::fillCameraInfoMsg(Stream& stream,
     {
         RCLCPP_WARN_ONCE(
           logger_,
-          "The fields image_width and image_height (%ix%i) in the YAML specified by 'camera_info_url' "
-          "parameter seams to be inconsistent with the actual image size (%ix%i). Please set them there, "
-          "because actual image size and specified image size can be different due to the "
-          "region of interest (ROI) feature. In the YAML the image size should be the one on which "
-          "the camera was calibrated. See CameraInfo.msg specification!",
-          stream.p_cam_info_msg->width, stream.p_cam_info_msg->height, p_img_msg->width, p_img_msg->height);
+          "The fields image_width and image_height (%ix%i) in the YAML specified by "
+          "'camera_info_url' parameter seams to be inconsistent with the actual "
+          "image size (%ix%i). Please set them there, because actual image size and specified "
+          "image size can be different due to the region of interest (ROI) feature. In the YAML "
+          "the image size should be the one on which the camera was calibrated. "
+          "See CameraInfo.msg specification!",
+          stream.p_cam_info_msg->width, stream.p_cam_info_msg->height,
+          p_img_msg->width, p_img_msg->height);
         stream.p_cam_info_msg->width  = p_img_msg->width;
         stream.p_cam_info_msg->height = p_img_msg->height;
     }

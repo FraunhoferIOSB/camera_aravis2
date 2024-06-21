@@ -29,6 +29,9 @@
 #ifndef CAMERA_ARAVIS2__CAMERA_DRIVER_GV_H_
 #define CAMERA_ARAVIS2__CAMERA_DRIVER_GV_H_
 
+// Yaml-cpp
+#include <yaml-cpp/yaml.h>
+
 // Std
 #include <memory>
 #include <string>
@@ -53,6 +56,7 @@ extern "C"
 #include "camera_aravis2/config_structs.h"
 #include "camera_aravis2/conversion_utils.h"
 #include "camera_aravis2/image_buffer_pool.h"
+#include <camera_aravis2_msgs/msg/camera_diagnostics.hpp>
 
 namespace camera_aravis2
 {
@@ -351,6 +355,22 @@ class CameraDriverGv : public CameraAravisNodeBase
     void tuneGvStream(ArvGvStream* p_stream) const;
 
     /**
+     * Set up publisher for camera diagnostics.
+     *
+     * In this, the YAML file configuring the diagnostics which are to be published is read and
+     * parsed.
+     */
+    void setUpCameraDiagnosticPublisher();
+
+    /**
+     * Read and publish camera diagnostics.
+     *
+     * This runs in a separate thread and loops at the given rate to read the stats from the camera
+     * and published them on hte appropriate topic.
+     */
+    void publishCameraDiagnosticsLoop(double rate) const;
+
+    /**
      * @brief Check the status of the Precision Time Protocol and reset its clock if applicable.     *
      * The clock will only be reset if the status of PTP is "Faulty", "Disabled", or
      * "Initializing".
@@ -430,6 +450,18 @@ class CameraDriverGv : public CameraAravisNodeBase
 
     /// Thread in which the streams are spawned.
     std::thread spawn_stream_thread_;
+
+    /// Atomic flag, indicating if diagnostics are published.
+    std::atomic<bool> is_diagnostics_published_;
+
+    /// Thead in which the publishing of the camera diagnostics runs.
+    std::thread diagnostic_thread_;
+
+    /// Pointer to publisher for camera diagnostics.
+    rclcpp::Publisher<camera_aravis2_msgs::msg::CameraDiagnostics>::SharedPtr p_diagnostic_pub_;
+
+    /// YAML node holding diagnostic features
+    YAML::Node diagnostic_features_;
 
     /// List of pointers to data pair for the new-buffer callback.
     std::vector<std::shared_ptr<std::pair<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;

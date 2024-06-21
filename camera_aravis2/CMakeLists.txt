@@ -36,14 +36,17 @@ find_package(camera_info_manager REQUIRED)
 
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 find_package(camera_aravis2_msgs REQUIRED)
 
 find_package(ARAVIS REQUIRED)
 find_package(GLIB2 REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 include_directories(include
   ${ARAVIS_INCLUDE_DIRS}
   ${GLIB2_INCLUDE_DIRS}
+  ${YAML_CPP_INCLUDE_DIRS}
 )
 
 # Library
@@ -58,6 +61,8 @@ set(DEPENDENCIES
   camera_info_manager
   std_msgs
   sensor_msgs
+  diagnostic_msgs
+  camera_aravis2_msgs
 )
 
 set(LIBRARIES
@@ -67,6 +72,7 @@ set(LIBRARIES
   gobject-2.0
   cv_bridge::cv_bridge
   image_transport::image_transport
+  ${YAML_CPP_LIBRARY_DIRS}
 )
 
 add_library(${LIBRARY_NAME} SHARED

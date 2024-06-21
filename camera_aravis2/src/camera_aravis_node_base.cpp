@@ -229,7 +229,9 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
     }
     else if constexpr (std::is_same_v<T, std::string>)
     {
-        value = arv_device_get_string_feature_value(p_device_, feature_name.c_str(), err.ref());
+        const char* tmpPtr =
+          arv_device_get_string_feature_value(p_device_, feature_name.c_str(), err.ref());
+        value = (tmpPtr) ? std::string(tmpPtr) : "";
     }
     else if constexpr (std::is_same_v<T, int>)
     {

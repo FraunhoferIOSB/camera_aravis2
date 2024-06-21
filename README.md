@@ -32,6 +32,7 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
 - [FAQ](#faq)
     - [How to use PTP](#how-to-use-ptp)
     - [How to set specific analog control values (e.g. balance ratios)](#how-to-set-specific-analog-control-values-eg-balance-ratios)
+    - [How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)
 - [Known Issues](#known-issues)
 
 ------------------------
@@ -64,6 +65,14 @@ The configuration of the camera driver is divided into a driver-specific and Gen
     - Type: String
     - Default: ""
     - Optional. If no frame ID is specified, the name of the node will be used.
+- ```diagnostic_yaml_url```: URL to yaml file specifying the camera features which are to be 
+monitored. See '[How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)' for more info.
+	- Type: String
+	- Default: ""
+    - Optional. If left empty no diagnostic features will be read and published.
+- ```diagnostic_publish_rate```: Rate (in Hz) at which to read and publish the diagnostic data.
+	- Type: double
+	- Default: 0.1 (every 10 seconds)
 
 #### GenICam-Specific Parameters
 
@@ -330,6 +339,25 @@ For example:
                 }]
     ...
 ```
+
+## How to publish camera diagnostics / status
+
+Camera_aravis allows to periodically monitor custom camera features and publish them in a designated
+topic named ```~/diagnostics``` in a message type as specified in 
+[CameraDiagnostics.msg](camera_aravis2_msgs/msg/CameraDiagnostics.msg). In order to configure and customize this 
+status monitoring, two [launch parameters](#driver-specific-parameters) are provided:
+- 'diagnostic_publish_rate', and
+- 'diagnostic_yaml_url'.
+
+An example of such a diagnostic yaml file is given in 
+[camera_diagnostics_example.yaml](camera_aravis2/config/camera_diagnostics_example.yaml). This file should hold a list of 
+```FeatureName``` together with a corresponding ```Type``` (bool, float, int, or string) for each
+feature which is to be monitored. If a feature is associated with a feature selector, one can 
+additionally specify a list of ```Selectors```. Each entry in this list should again have a 
+```FeatureName``` and ```Type```, as well as a ```Value``` to set.
+
+For each feature a key-value pair is constructed and published in the ```data``` field of the 
+message stated above. If a feature as a list of selectors, one key-value pair is constructed for each Feature-Selector pair.
 
 ## Known Issues
 

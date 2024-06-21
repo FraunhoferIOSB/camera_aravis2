@@ -17,6 +17,7 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 
 file(GLOB msg_files
   RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/"
@@ -33,7 +34,11 @@ message(TRACE "Service files found: ${srv_files}")
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${srv_files}
-  DEPENDENCIES builtin_interfaces std_msgs sensor_msgs
+  DEPENDENCIES 
+  builtin_interfaces 
+  std_msgs 
+  sensor_msgs
+  diagnostic_msgs
 )
 
 ament_export_dependencies(rosidl_default_runtime)
