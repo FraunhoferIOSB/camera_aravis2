@@ -1445,7 +1445,7 @@ void CameraDriverGv::publishCameraDiagnosticsLoop(double rate) const
 
     while (rclcpp::ok() && is_diagnostics_published_)
     {
-        cam_diagnostic_msg.header.stamp = this->get_clock()->now();
+        cam_diagnostic_msg.header.stamp = this->now();
 
         cam_diagnostic_msg.data.clear();
 
