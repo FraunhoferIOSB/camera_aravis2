@@ -1,5 +1,5 @@
-image_width: 1936
-image_height: 1216
+image_width: 1920
+image_height: 1200
 camera_name: camera_gv_vis
 camera_matrix:
   rows: 3

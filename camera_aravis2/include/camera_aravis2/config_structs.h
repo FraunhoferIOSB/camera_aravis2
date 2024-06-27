@@ -32,6 +32,33 @@
 // Std
 #include <cfloat>
 #include <string>
+#include <tuple>
+#include <vector>
+
+namespace camera_aravis2
+{
+
+/**
+ * @brief Struct holding control settings for transport layer.
+ *
+ */
+struct TransportLayerControl
+{
+    /// Packet size in bytes.
+    int64_t packet_size = 0;
+
+    /// Delay (in GEV timestamp counter unit) to insert between each packet
+    int64_t inter_packet_delay = 0;
+
+    /// Flag indicating if Precision Time Protocol (PTP) is enabled.
+    bool is_ptp_enable = false;
+
+    /// Status of PTP.
+    std::string ptp_status = "n/a";
+
+    // Offset from the PTP master clock in nanoseconds.
+    int64_t ptp_offset = 0;
+};
 
 /**
  * @brief Struct representing sensor
@@ -48,7 +75,7 @@ struct Sensor
     int32_t height = 0;
 
     /// Pixel format associated ith the sensor.
-    std::string pixel_format = "";
+    std::string pixel_format = "n/a";
 
     /// Number of pixel associated with the pixel format.
     size_t n_bits_pixel = 0;
@@ -58,6 +85,18 @@ struct Sensor
 
     /// Flip the image vertically on the device.
     bool reverse_y = false;
+
+    /// Number of pixel that are combined horizontally.
+    int binning_x = 1;
+
+    /// Mode to horizontally combine pixel.
+    std::string binning_mode_x = "n/a";
+
+    /// Number of pixel that are combined vertically.
+    int binning_y = 1;
+
+    /// Mode to vertically combine pixel.
+    std::string binning_mode_y = "n/a";
 };
 
 /**
@@ -97,16 +136,16 @@ struct ImageRoi
 struct AcquisitionControl
 {
     /// String representing acquisition mode of the camera.
-    std::string acquisition_mode = "";
+    std::string acquisition_mode = "n/a";
 
     /// Number of frames to acquire when 'MultiFrame' is selected as acquisition mode.
     int frame_count = 0;
 
     /// Exposure mode used for acquisition.
-    std::string exposure_mode = "";
+    std::string exposure_mode = "n/a";
 
-    /// Auto mode for exposure if not exposure not controlled by trigger.
-    std::string exposure_auto = "";
+    /// Auto mode for exposure if exposure not controlled by trigger.
+    std::string exposure_auto = "n/a";
 
     /// Exposure time in us when exposure mode is set to 'Timed' and auto exposure is 'Off'.
     double exposure_time = 0;
@@ -123,5 +162,32 @@ struct AcquisitionControl
     /// Maximum frame rate possible.
     double frame_rate_max = DBL_MAX;
 };
+
+/**
+ * @brief Struct holding control settings for analog control.
+ *
+ */
+struct AnalogControl
+{
+    /// Auto mode for gain control.
+    std::string gain_auto = "n/a";
+
+    /// List of absolute gain values {(selector, value, min, max)}
+    std::vector<std::tuple<std::string, float, float, float>> gain;
+
+    /// Auto mode for black level adjustment.
+    std::string black_level_auto = "n/a";
+
+    /// List of absolute black level values {(selector, value, min, max)}
+    std::vector<std::tuple<std::string, float, float, float>> black_level;
+
+    /// Auto mode for white balance adjustment.
+    std::string balance_white_auto = "n/a";
+
+    /// List of balance ratio values {(selector, value, min, max)}
+    std::vector<std::tuple<std::string, float, float, float>> balance_ratio;
+};
+
+}  // namespace camera_aravis2
 
 #endif  // CAMERA_ARAVIS2__CONFIG_STRUCTS_H_

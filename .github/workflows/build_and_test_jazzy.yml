@@ -1,7 +1,7 @@
 # This config uses industrial_ci (https://github.com/ros-industrial/industrial_ci.git).
 # For troubleshooting, see README (https://github.com/ros-industrial/industrial_ci/blob/master/README.rst)
 
-name: Iron Irwini
+name: Jazzy Jalisco
 
 on: # this determines when this workflow is run
   push:
@@ -17,7 +17,7 @@ jobs:
     strategy:
       # fail-fast: false # uncomment if failing jobs should not cancel the others immediately
       matrix: # matrix is the product of entries
-        ROS_DISTRO: [iron]
+        ROS_DISTRO: [jazzy]
         ROS_REPO: [main]
     env:
       ADDITIONAL_DEBS: "libaravis-dev ros-${{ matrix.ROS_DISTRO }}-diagnostic-msgs" # List the name of DEB(s delimitted by whitespace if multiple DEBs specified). Needs to be full-qualified Ubuntu package name.

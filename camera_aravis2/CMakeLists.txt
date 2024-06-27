@@ -36,15 +36,26 @@ find_package(camera_info_manager REQUIRED)
 
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 find_package(camera_aravis2_msgs REQUIRED)
 
 find_package(ARAVIS REQUIRED)
 find_package(GLIB2 REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 include_directories(include
   ${ARAVIS_INCLUDE_DIRS}
   ${GLIB2_INCLUDE_DIRS}
+  ${YAML_CPP_INCLUDE_DIRS}
 )
+
+#if ROS_DISTRO is unequal to iron and humble add define to build with matched events
+if(NOT "$ENV{ROS_DISTRO}" STREQUAL "humble" AND NOT "$ENV{ROS_DISTRO}" STREQUAL "iron")
+  set(COMMON_COMPILE_DEFINITIONS
+    ${COMMON_COMPILE_DEFINITIONS}
+    -DWITH_MATCHED_EVENTS
+  )
+endif()
 
 # Library
 
@@ -58,6 +69,8 @@ set(DEPENDENCIES
   camera_info_manager
   std_msgs
   sensor_msgs
+  diagnostic_msgs
+  camera_aravis2_msgs
 )
 
 set(LIBRARIES
@@ -67,6 +80,7 @@ set(LIBRARIES
   gobject-2.0
   cv_bridge::cv_bridge
   image_transport::image_transport
+  ${YAML_CPP_LIBRARY_DIRS}
 )
 
 add_library(${LIBRARY_NAME} SHARED
@@ -79,12 +93,14 @@ add_library(${LIBRARY_NAME} SHARED
   src/image_buffer_pool.cpp
 )
 target_link_libraries(${LIBRARY_NAME} ${LIBRARIES})
+target_compile_definitions(${LIBRARY_NAME} PRIVATE ${COMMON_COMPILE_DEFINITIONS})
 ament_target_dependencies(${LIBRARY_NAME} ${DEPENDENCIES})
 
 # camera_driver_gv node
 
 set(CAMERA_DRIVER_GV_EXEC_NAME camera_driver_gv)
 add_executable(${CAMERA_DRIVER_GV_EXEC_NAME} src/camera_driver_gv_main.cpp)
+target_compile_definitions(${CAMERA_DRIVER_GV_EXEC_NAME} PRIVATE ${COMMON_COMPILE_DEFINITIONS})
 target_link_libraries(${CAMERA_DRIVER_GV_EXEC_NAME} ${LIBRARY_NAME})
 rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraDriverGv")
 
@@ -92,6 +108,7 @@ rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraDriverGv
 
 set(CAMERA_DRIVER_UV_EXEC_NAME camera_driver_uv)
 add_executable(${CAMERA_DRIVER_UV_EXEC_NAME} src/camera_driver_uv_main.cpp)
+target_compile_definitions(${CAMERA_DRIVER_UV_EXEC_NAME} PRIVATE ${COMMON_COMPILE_DEFINITIONS})
 target_link_libraries(${CAMERA_DRIVER_UV_EXEC_NAME} ${LIBRARY_NAME})
 rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraDriverUv")
 
@@ -99,12 +116,14 @@ rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraDriverUv
 
 set(CAMERA_FINDER_EXEC_NAME camera_finder)
 add_executable(${CAMERA_FINDER_EXEC_NAME} src/camera_finder_main.cpp)
+target_compile_definitions(${CAMERA_FINDER_EXEC_NAME} PRIVATE ${COMMON_COMPILE_DEFINITIONS})
 target_link_libraries(${CAMERA_FINDER_EXEC_NAME} ${LIBRARY_NAME})
 
 # camera_xml_exporter node
 
 set(CAMERA_XML_EXPORTER_EXEC_NAME camera_xml_exporter)
 add_executable(${CAMERA_XML_EXPORTER_EXEC_NAME} src/camera_xml_exporter_main.cpp)
+target_compile_definitions(${CAMERA_XML_EXPORTER_EXEC_NAME} PRIVATE ${COMMON_COMPILE_DEFINITIONS})
 target_link_libraries(${CAMERA_XML_EXPORTER_EXEC_NAME} ${LIBRARY_NAME})
 rclcpp_components_register_nodes(${LIBRARY_NAME} "camera_aravis2::CameraXmlExporter")
 

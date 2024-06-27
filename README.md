@@ -14,7 +14,7 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
 
 | Service    | devel  | main |
 | ---------- | ------- | ------ |
-| GitHub     | [![Humble Hawksbill](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml/badge.svg?branch=devel)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml)<br>[![Iron Irwini](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml/badge.svg?branch=devel)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml) | [![Humble Hawksbill](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml/badge.svg?branch=main)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml)<br>[![Iron Irwini](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml/badge.svg?branch=main)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml) |
+| GitHub     | [![Humble Hawksbill](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml/badge.svg?branch=devel)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml)<br>[![Iron Irwini](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml/badge.svg?branch=devel)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml)<br>[![Jazzy Jalisco](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_jazzy.yml/badge.svg?branch=devel)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_jazzy.yml)| [![Humble Hawksbill](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml/badge.svg?branch=main)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_humble.yml)<br>[![Iron Irwini](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml/badge.svg?branch=main)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_iron.yml)<br>[![Jazzy Jalisco](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_jazzy.yml/badge.svg?branch=main)](https://github.com/FraunhoferIOSB/camera_aravis2/actions/workflows/build_and_test_jazzy.yml)|
 
 ------------------------
 
@@ -29,6 +29,10 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
     - [Requirements](#requirements)
     - [Build](#build)
     - [Test](#test)
+- [FAQ](#faq)
+    - [How to use PTP](#how-to-use-ptp)
+    - [How to set specific analog control values (e.g. balance ratios)](#how-to-set-specific-analog-control-values-eg-balance-ratios)
+    - [How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)
 - [Known Issues](#known-issues)
 
 ------------------------
@@ -61,6 +65,14 @@ The configuration of the camera driver is divided into a driver-specific and Gen
     - Type: String
     - Default: ""
     - Optional. If no frame ID is specified, the name of the node will be used.
+- ```diagnostic_yaml_url```: URL to yaml file specifying the camera features which are to be 
+monitored. See '[How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)' for more info.
+	- Type: String
+	- Default: ""
+    - Optional. If left empty no diagnostic features will be read and published.
+- ```diagnostic_publish_rate```: Rate (in Hz) at which to read and publish the diagnostic data.
+	- Type: double
+	- Default: 0.1 (every 10 seconds)
 
 #### GenICam-Specific Parameters
 
@@ -69,25 +81,62 @@ The SNFC groups the individual features into numerous catagories (e.g. Image For
 Camera_aravis2 explicitly looks for a number of features in a couple of categories to be specified and tries to set the features accordingly. 
 If specified as launch parameter, camera_aravis2 will set the following features in the same order as listed below:
 
+- `DeviceControl` (List): GenICam parameters of the 'DeviceControl' category that are to be set. Here, no specific order is implemented. Nested parameter list is evaluated in alphabetical order.
+- `TransportLayerControl`
+    - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `GevSCPSPacketSize` (Int): Specifies the packet size, in bytes, which are to be send. This should correspond 'DeviceStreamChannelPacketSize' and the maximum transport unit (MTU) of the interface.
+    - `GevSCPD` (Int): Controls the delay (in GEV timestamp counter unit) to insert between
+each packet for this stream channel.
+    - `PtpEnable` (Bool): Enables the Precision Time Protocol (PTP).
+    - `END` (List): Additional GenICam parameters that are not be set at the end of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
 - `ImageFormatControl`
-    - `PixelFormat` (String): Format of the pixels provided by the device
-    - `ReverseX` (Bool): Flip horizontally the image sent by the device.
-    - `ReverseY` (Bool): Flip vertically the image sent by the device.
-    - `Width` (Int): Width of the image provided by the device (in pixels).
-    - `Height` (Int): Height of the image provided by the device (in pixels).
-    - `OffsetX` (Int): Horizontal offset from the origin to the region of interest (in pixels).
-    - `OffsetY` (Int): Vertical offset from the origin to the region of interest (in pixels).
+    - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `PixelFormat`* (String): Format of the pixels provided by the device.
+    - `ReverseX`* (Bool): Flip horizontally the image sent by the device.
+    - `ReverseY`* (Bool): Flip vertically the image sent by the device.
+    - `BinningHorizontal`* (Int): Number of pixels to horizontally combine together.
+    - `BinningHorizontalMode`* (String): Mode to use when BinningHorizontal is used. Values possible: 'Sum', or 'Average'.
+    - `BinningVertical`* (Int): Number of pixels to horizontally combine together.
+    - `BinningVerticalMode`* (String): Mode to use when BinningHorizontal is used. Values possible: 'Sum', or 'Average'.
+    - `Width`* (Int): Width of the image provided by the device (in pixels).
+    - `Height`* (Int): Height of the image provided by the device (in pixels).
+    - `OffsetX`* (Int): Horizontal offset from the origin to the region of interest (in pixels).
+    - `OffsetY`* (Int): Vertical offset from the origin to the region of interest (in pixels).
+    - `END` (List): Additional GenICam parameters that are not be set at the end of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
 - `AcquisitionControl`
-    - `AcquisitionMode` (String): Sets the acquisition mode of the device. Values possible: 'SingleFrame', 'MultiFrame', or 'Continuous.
-    - `AcquisitionFrameCount` (Int): Number of frames to acquire in MultiFrame Acquisition mode. Only evaluated if 'AcquisitionMode' is 'MultiFrame'.
-    - `ExposureMode` (String): Sets the operation mode of the Exposure. Values possible: 'Off', 'Timed', 'TriggerWidth', or 'TriggerControlled'.
-    - `ExposureAuto` (String): Sets the automatic exposure mode when ExposureMode is Timed. alues possible: 'Off', 'Once', or 'Continuous'.
-    - `ExposureTime` (Double): Sets the Exposure time when 'ExposureMode' is 'Timed' and
-'ExposureAuto' is 'Off'.
-    - `AcquisitionFrameRateEnable` (Bool): Controls if the AcquisitionFrameRate feature is writable and used to
-control the acquisition rate.
-    - `AcquisitionFrameRate` (Double): Controls the acquisition rate (in Hertz) at which the frames are
-captured.
+    - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `AcquisitionMode`* (String): Sets the acquisition mode of the device. Values possible: 'SingleFrame', 'MultiFrame', or 'Continuous'.
+    - `AcquisitionFrameCount`* (Int): Number of frames to acquire in MultiFrame Acquisition mode. Only evaluated if 'AcquisitionMode' is 'MultiFrame'.
+    - `ExposureMode`* (String): Sets the operation mode of the Exposure. Values possible: 'Off', 'Timed', 'TriggerWidth', or 'TriggerControlled'.
+    - `ExposureAuto`* (String): Sets the automatic exposure mode when ExposureMode is Timed. Values possible: 'Off', 'Once', or 'Continuous'.
+    - `ExposureTime`* (Double): Sets the Exposure time when 'ExposureMode' is 'Timed' and 'ExposureAuto' is 'Off'.
+    - `AcquisitionFrameRateEnable`* (Bool): Controls if the AcquisitionFrameRate feature is writable and used to control the acquisition rate.
+    - `AcquisitionFrameRate`* (Double): Controls the acquisition rate (in Hertz) at which the frames are captured.
+    - `END` (List): Additional GenICam parameters that are not be set at the end of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
+- `AnalogControl`
+    - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
+    - `GainAuto`* (String): Sets the automatic gain control mode. Values possible: 'Off', 'Once', or 'Continuous'.
+    - `Gain`* (List): Key-Value pairs of type string (key) and double (value) to set specific gain values in case 'GainAuto' is set to 'Off'. In this, the key will be set as value to the 'GainSelector' and the value will be set to the 'Gain' feature. The list is evaluated in alphabetical order.
+    - `BlackLevelAuto`* (String): Controls the mode for automatic black level adjustment. Values possible: 'Off', 'Once', or 'Continuous'.
+    - `BlackLevel`* (List): Key-Value pairs of type string (key) and double (value) to set specific black level values in case 'BlackLevelAuto' is set to 'Off'. In this, the key will be set as value to the 'BlackLevelSelector' and the value will be set to the 'BlackLevel' feature. The list is evaluated in alphabetical order.
+    - `BalanceWhiteAuto`* (String): Controls the mode for automatic black level adjustment. Values possible: 'Off', 'Once', or 'Continuous'.
+    - `BalanceRatio`* (List): Key-Value pairs of type string (key) and double (value) to set specific balance ratio values in case 'BalanceWhiteAuto' is set to 'Off'. In this, the key will be set as value to the 'BalanceRatioSelector' and the value will be set to the 'BalanceRatio' feature. The list is evaluated in alphabetical order.
+    - `END` (List): Additional GenICam parameters that are not be set at the end of the 'AcquisitionControl' section. Nested parameter list is evaluated in alphabetical order.
+
+In the sections where a certain order of predefined parameters is considered and implemented, the user can specify a list of additional GenICam parameters nested underneath the parameter `BEGIN` and `END`, respectively, which are not explicitly evaluated as part of the list above. 
+This allows for the user to specify parameters which are not known to camera_aravis2. 
+Similar holds for the parameters within the 'DeviceControl' category.
+It is to be noted, however, that the nested parameters are evaluated in alphabetical order, which might lead to unintended behavior, depending on the camera device.
+
+The example values that are given in case of string parameters are given in accordance with the GenICam SNFC.
+The possible values might differ according to the actual implementation by the camera manufacturer.
+
+Parameters marked with * are evaluated and set per stream/channel. 
+Meaning, that for a multi-channel or multi-source camera one can either specify a single parameter or a list of parameters (see 'PixelFormat' in the example below).
+In case a single parameter is specified, the corresponding value is set for all channels.
+If a list of parameters is given, for each channel the value with the corresponding channel index will be set.
+If the list is smaller than the available channels, the value of the last entry will be set for the remaining channels.
+Please note, that the flexibility of setting different parameters values for the individual channels depends on the actual implementation by the camera manufacturer.
 
 When launching the camera driver, the features are to be configured as nested launch parameters.
 While the parameters are evaluated by camera_aravis2 in the specific order which is listed above, they can be specified in an arbitrary order in the launch file.
@@ -101,15 +150,34 @@ While the parameters are evaluated by camera_aravis2 in the specific order which
                     ...
                     
                     # GenICam-specific parameters
+                    "DeviceControl": {
+                        "DeviceLinkThroughputLimit": 125000000,
+                        "DeviceLinkThroughputLimitMode": "On"
+                    },
+                    "TransportLayerControl": {
+                        "GevSCPSPacketSize": 9000,
+                        "PtpEnable": True
+                    },
                     "ImageFormatControl": {
+                        "BEGIN": {
+                            "BinningSelector": "Digital"
+                        },
                         "PixelFormat": "BayerRG8",
                         "Width": 1920,
-                        "Height": 1200,
+                        "Height": 1200
                     },
                     "AcquisitionControl": {
                         "ExposureMode": "Timed",
                         "ExposureAuto": "Continuous",
                         "AcquisitionFrameRate": 30.0
+                    },
+                    "AnalogControl": {
+                        "GainAuto": "Continuous",
+                        "BalanceWhiteAuto": "Off",
+                        "BalanceRatio": {
+                            "Red": 1.6,
+                            "Blue": 2.0
+                        }
                     }
                 }]
     ...
@@ -189,6 +257,12 @@ arv-tool-0.8 --name=<camera_guid> genicam
 
 ### Build
 
+Install aravis:
+
+```bash
+sudo apt install libaravis-dev
+```
+
 Initialize `rosdep` and install dependencies:
 
 ```bash
@@ -215,6 +289,75 @@ colcon test --event-handlers=console_direct+
 colcon test-result --all
 
 ```
+
+## FAQ
+
+### How to use PTP
+
+Some cameras support the use of the Precision Time Protocol (PTP) to set the timestamps of the captured images. To activate and use it just set the launch parameter 'TransportLayerControl.PtpEnable' to 'True' as seen blow:
+
+```Python
+    ...
+    parameters=[{
+                    ...
+                    "TransportLayerControl": {
+                        "PtpEnable": True
+                    }
+                    ...
+                }]
+    ...
+```
+
+### How to set specific analog control values (e.g. balance ratios)
+
+Typically GenICam cameras support three different modes for automatic control of analog settings (e.g. gain, black level, white balance), namely 'Continuous', 'Once', and 'Off'. These can be set via the launch parameter and corresponding feature names, i.e. 'GainAuto', 'BlackLevelAuto', 'BalanceWhiteAuto'. As the names suggest, the first mode will continuously adjust the white 
+balance, while the second mode will measure the white balance once and then freeze the ratio
+parameters. In case, of the third mode, the ratios of the different color channels can and need to be set manually.
+
+Use the launch parameters of camera_aravis2 to manually set the ratio parameters and configure the analog control, by
+
+- setting the corresponding auto feature to 'Off',
+- and providing a list of key-value pairs of type string (key) and double (value) for the corresponding feature. 
+
+In this, the key will be set as value to the corresponding selector (e.g. 'GainSelector', 'BalanceRatioSelector') and the value will be set to the feature.
+
+For example:
+
+```Python
+    ...
+    parameters=[{
+                    ...
+                    "AnalogControl": {
+                        "GainAuto": "Continuous",
+                        "BalanceWhiteAuto": "Off",
+                        "BalanceRatio": {
+                            "Red": 1.6,
+                            "Blue": 2.0
+                        }
+                    }
+                    ...
+                }]
+    ...
+```
+
+## How to publish camera diagnostics / status
+
+Camera_aravis allows to periodically monitor custom camera features and publish them in a designated
+topic named ```~/diagnostics``` in a message type as specified in 
+[CameraDiagnostics.msg](camera_aravis2_msgs/msg/CameraDiagnostics.msg). In order to configure and customize this 
+status monitoring, two [launch parameters](#driver-specific-parameters) are provided:
+- 'diagnostic_publish_rate', and
+- 'diagnostic_yaml_url'.
+
+An example of such a diagnostic yaml file is given in 
+[camera_diagnostics_example.yaml](camera_aravis2/config/camera_diagnostics_example.yaml). This file should hold a list of 
+```FeatureName``` together with a corresponding ```Type``` (bool, float, int, or string) for each
+feature which is to be monitored. If a feature is associated with a feature selector, one can 
+additionally specify a list of ```Selectors```. Each entry in this list should again have a 
+```FeatureName``` and ```Type```, as well as a ```Value``` to set.
+
+For each feature a key-value pair is constructed and published in the ```data``` field of the 
+message stated above. If a feature as a list of selectors, one key-value pair is constructed for each Feature-Selector pair.
 
 ## Known Issues
 

@@ -45,7 +45,8 @@ CameraAravisNodeBase::CameraAravisNodeBase(const std::string& name,
   logger_(this->get_logger()),
   p_device_(nullptr),
   p_camera_(nullptr),
-  guid_("")
+  guid_(""),
+  is_verbose_enable_(false)
 {
 }
 
@@ -158,6 +159,54 @@ void CameraAravisNodeBase::setUpParameters()
 }
 
 //==================================================================================================
+[[nodiscard]] bool CameraAravisNodeBase::getNestedParameter(
+  const std::string& parent_name,
+  const std::string& param_name,
+  rclcpp::ParameterValue& param_value) const
+{
+    std::string key = parent_name + "." + param_name;
+    if (parameter_overrides_.find(key) != parameter_overrides_.end())
+    {
+        param_value = parameter_overrides_.at(key);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+//==================================================================================================
+[[nodiscard]] bool CameraAravisNodeBase::getNestedParameterList(
+  const std::string& parent_name,
+  const std::string& param_name,
+  std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const
+{
+    param_values.clear();
+
+    //--- if param_name is not empty append with '.' to parent name.
+    std::string key = (!param_name.empty()) ? parent_name + "." + param_name : parent_name;
+    key.append(".");
+
+    for (auto itr = parameter_overrides_.begin();
+         itr != parameter_overrides_.end();
+         ++itr)
+    {
+        //--- if parameter override begins with key
+        if (itr->first.rfind(key) == 0)
+        {
+            std::string feature_name = itr->first.substr(key.size());
+            param_values.push_back(std::make_pair(feature_name, itr->second));
+        }
+    }
+
+    if (param_values.empty())
+        return false;
+    else
+        return true;
+}
+
+//==================================================================================================
 template <typename T>
 bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& value) const
 {
@@ -180,9 +229,15 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
     }
     else if constexpr (std::is_same_v<T, std::string>)
     {
-        value = arv_device_get_string_feature_value(p_device_, feature_name.c_str(), err.ref());
+        const char* tmpPtr =
+          arv_device_get_string_feature_value(p_device_, feature_name.c_str(), err.ref());
+        value = (tmpPtr) ? std::string(tmpPtr) : "";
     }
     else if constexpr (std::is_same_v<T, int>)
+    {
+        value = arv_device_get_integer_feature_value(p_device_, feature_name.c_str(), err.ref());
+    }
+    else if constexpr (std::is_same_v<T, int64_t>)
     {
         value = arv_device_get_integer_feature_value(p_device_, feature_name.c_str(), err.ref());
     }
@@ -209,6 +264,7 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, bool&) const;
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, std::string&) const;
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, int&) const;
+template bool CameraAravisNodeBase::getFeatureValue(const std::string&, int64_t&) const;
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, float&) const;
 template bool CameraAravisNodeBase::getFeatureValue(const std::string&, double&) const;
 
@@ -222,6 +278,8 @@ bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, cons
     //--- assert that p_device is set
     if (!p_device_)
         return false;
+
+    RCLCPP_DEBUG_STREAM(logger_, "Setting '" << feature_name << "' to '" << value << "'");
 
     //--- check if feature is available
     if (!arv_device_is_feature_available(p_device_, feature_name.c_str(), err.ref()))
@@ -280,6 +338,78 @@ template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const do
 
 //==================================================================================================
 template <typename T>
+bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, const T& value,
+                                           const T& min, const T& max) const
+{
+    T bounded_val = std::max(min, std::min(value, max));
+
+    return setFeatureValue(feature_name, bounded_val);
+}
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const int&,
+                                                    const int&, const int&) const;
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const int64_t&,
+                                                    const int64_t&, const int64_t&) const;
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const float&,
+                                                    const float&, const float&) const;
+template bool CameraAravisNodeBase::setFeatureValue(const std::string&, const double&,
+                                                    const double&, const double&) const;
+
+//==================================================================================================
+template <typename T>
+bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string& feature_name, const T& value,
+                                                  T* min, T* max) const
+{
+    bool is_successful = true;
+    GuardedGError err;
+
+    T tmpMin, tmpMax;
+    if (!min)
+        min = &tmpMin;
+    if (!max)
+        max = &tmpMax;
+
+    //--- assert that p_device is set
+    if (!p_device_)
+        return false;
+
+    //--- check if feature is available
+    if (!arv_device_is_feature_available(p_device_, feature_name.c_str(), err.ref()))
+    {
+        RCLCPP_WARN(logger_, "Feature '%s' is not available. Value will not be set.",
+                    feature_name.c_str());
+        ASSERT_GERROR(err, logger_, is_successful);
+        return false;
+    }
+
+    if constexpr (std::is_same_v<T, int64_t>)
+    {
+        arv_device_get_integer_feature_bounds(p_device_, feature_name.c_str(), min, max, err.ref());
+    }
+    else if constexpr (std::is_same_v<T, double>)
+    {
+        arv_device_get_float_feature_bounds(p_device_, feature_name.c_str(), min, max, err.ref());
+    }
+    else
+    {
+        RCLCPP_WARN(logger_, "Setting bounded feature of type '%s' is currently not supported. "
+                             "Value will not be set.",
+                    typeid(T).name());
+    }
+
+    ASSERT_GERROR_MSG(err, logger_,
+                      "In setting value for feature '" + feature_name + "'.", is_successful);
+
+    T boundedValue = std::max(*min, std::min(value, *max));
+
+    return setFeatureValue<T>(feature_name, boundedValue);
+}
+template bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string&, const int64_t&,
+                                                           int64_t*, int64_t*) const;
+template bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string&, const double&,
+                                                           double*, double*) const;
+
+//==================================================================================================
+template <typename T>
 bool CameraAravisNodeBase::setFeatureValueFromParameter(
   const std::string& feature_name,
   const rclcpp::ParameterValue& parameter_value,
@@ -328,13 +458,13 @@ template bool CameraAravisNodeBase::setFeatureValueFromParameter<double>(
 
 //==================================================================================================
 template <typename T>
-bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
+bool CameraAravisNodeBase::setFeatureValueFromParameter(
   const std::string& feature_name,
-  const T& min, const T& max,
   const rclcpp::ParameterValue& parameter_value,
+  const T& min, const T& max,
   const uint& idx) const
 {
-    T bounded_value;
+    T unbounded_value;
 
     try
     {
@@ -342,7 +472,7 @@ bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
         //--- BYTE_ARRAY is the first 'array' type in the list
         if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
         {
-            bounded_value = std::max(min, std::min(parameter_value.get<T>(), max));
+            unbounded_value = parameter_value.get<T>();
         }
         else
         {
@@ -353,9 +483,8 @@ bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
             if (value_list.empty())
                 return false;
 
-            T unbounded_value = value_list.at(std::min(idx,
-                                                       static_cast<uint>(value_list.size() - 1)));
-            bounded_value     = std::max(min, std::min(unbounded_value, max));
+            unbounded_value =
+              value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
         }
     }
     catch (const rclcpp::ParameterTypeException& e)
@@ -366,20 +495,101 @@ bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
         return false;
     }
 
-    return setFeatureValue<T>(feature_name, bounded_value);
+    return setFeatureValue<T>(feature_name, unbounded_value, min, max);
 }
-template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<bool>(
-  const std::string&, const bool&, const bool&,
-  const rclcpp::ParameterValue&, const uint&) const;
-template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<std::string>(
-  const std::string&, const std::string&, const std::string&,
-  const rclcpp::ParameterValue&, const uint&) const;
+template bool CameraAravisNodeBase::setFeatureValueFromParameter<int64_t>(
+  const std::string&, const rclcpp::ParameterValue&,
+  const int64_t&, const int64_t&, const uint&) const;
+template bool CameraAravisNodeBase::setFeatureValueFromParameter<double>(
+  const std::string&, const rclcpp::ParameterValue&,
+  const double&, const double&, const uint&) const;
+
+//==================================================================================================
+bool CameraAravisNodeBase::setFeatureValuesFromParameterList(
+  const std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values,
+  const uint& idx) const
+{
+    bool is_successful = true;
+
+    for (auto itr = param_values.begin(); itr != param_values.end(); ++itr)
+    {
+        if (itr->second.get_type() == rclcpp::PARAMETER_BOOL ||
+            itr->second.get_type() == rclcpp::PARAMETER_BOOL_ARRAY)
+        {
+            is_successful &= setFeatureValueFromParameter<bool>(itr->first, itr->second, idx);
+        }
+        else if (itr->second.get_type() == rclcpp::PARAMETER_STRING ||
+                 itr->second.get_type() == rclcpp::PARAMETER_STRING_ARRAY)
+        {
+            is_successful &= setFeatureValueFromParameter<std::string>(itr->first, itr->second,
+                                                                       idx);
+        }
+        else if (itr->second.get_type() == rclcpp::PARAMETER_INTEGER ||
+                 itr->second.get_type() == rclcpp::PARAMETER_INTEGER_ARRAY)
+        {
+            is_successful &= setFeatureValueFromParameter<int64_t>(itr->first, itr->second, idx);
+        }
+        else if (itr->second.get_type() == rclcpp::PARAMETER_DOUBLE ||
+                 itr->second.get_type() == rclcpp::PARAMETER_DOUBLE_ARRAY)
+        {
+            is_successful &= setFeatureValueFromParameter<double>(itr->first, itr->second, idx);
+        }
+        else
+        {
+            RCLCPP_ERROR(logger_, "Parameter '%s' is of unknown type. ",
+                         itr->first.c_str());
+            is_successful = false;
+        }
+    }
+
+    return is_successful;
+}
+
+//==================================================================================================
+template <typename T>
+bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter(
+  const std::string& feature_name, const rclcpp::ParameterValue& parameter_value,
+  T* min, T* max,
+  const uint& idx) const
+{
+    T value;
+
+    try
+    {
+        //--- check if single parameter of parameter array
+        //--- BYTE_ARRAY is the first 'array' type in the list
+        if (parameter_value.get_type() < rclcpp::PARAMETER_BYTE_ARRAY)
+        {
+            value = parameter_value.get<T>();
+        }
+        else
+        {
+            // List of values that are to be set. If the list is smaller than the number of streams
+            // the last value of the is used for the remaining streams.
+            std::vector<T> value_list = parameter_value.get<std::vector<T>>();
+
+            if (value_list.empty())
+                return false;
+
+            value = value_list.at(std::min(idx, static_cast<uint>(value_list.size() - 1)));
+        }
+    }
+    catch (const rclcpp::ParameterTypeException& e)
+    {
+        RCLCPP_ERROR(logger_, "Exception while trying to set bounded value for '%s'. "
+                              "Reason: %s",
+                     feature_name.c_str(), e.what());
+        return false;
+    }
+
+    return setBoundedFeatureValue<T>(feature_name, value, min, max);
+}
 template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<int64_t>(
-  const std::string&, const int64_t&, const int64_t&,
-  const rclcpp::ParameterValue&, const uint&) const;
+  const std::string&, const rclcpp::ParameterValue&,
+  int64_t*, int64_t*, const uint&) const;
 template bool CameraAravisNodeBase::setBoundedFeatureValueFromParameter<double>(
-  const std::string&, const double&, const double&,
-  const rclcpp::ParameterValue&, const uint&) const;
+  const std::string&, const rclcpp::ParameterValue&,
+  double*, double*, const uint&) const;
 
 //==================================================================================================
 template <typename T>
@@ -426,6 +636,35 @@ template bool CameraAravisNodeBase::isParameterValueEqualTo<int64_t>(
   const rclcpp::ParameterValue&, const int64_t&, const uint&) const;
 template bool CameraAravisNodeBase::isParameterValueEqualTo<double>(
   const rclcpp::ParameterValue&, const double&, const uint&) const;
+
+//==================================================================================================
+bool CameraAravisNodeBase::executeCommand(const std::string& feature_name) const
+{
+    bool is_successful = true;
+    GuardedGError err;
+
+    //--- assert that p_device is set
+    if (!p_device_)
+        return false;
+
+    RCLCPP_DEBUG(logger_, "Executing command '%s'.", feature_name.c_str());
+
+    //--- check if feature is available
+    if (!arv_device_is_feature_available(p_device_, feature_name.c_str(), err.ref()))
+    {
+        RCLCPP_WARN(logger_, "Command '%s' is not available. Value will not be executed.",
+                    feature_name.c_str());
+        ASSERT_GERROR(err, logger_, is_successful);
+        return false;
+    }
+
+    arv_device_execute_command(p_device_, feature_name.c_str(), err.ref());
+
+    ASSERT_GERROR_MSG(err, logger_,
+                      "In executing command '" + feature_name + "'.", is_successful);
+
+    return is_successful;
+}
 
 //==================================================================================================
 std::string CameraAravisNodeBase::constructCameraGuidStr(ArvCamera* p_cam)

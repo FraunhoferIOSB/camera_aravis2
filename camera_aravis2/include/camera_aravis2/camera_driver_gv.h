@@ -29,11 +29,14 @@
 #ifndef CAMERA_ARAVIS2__CAMERA_DRIVER_GV_H_
 #define CAMERA_ARAVIS2__CAMERA_DRIVER_GV_H_
 
+// Yaml-cpp
+#include <yaml-cpp/yaml.h>
+
 // Std
 #include <memory>
 #include <string>
-#include <tuple>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 // Aravis
@@ -53,6 +56,7 @@ extern "C"
 #include "camera_aravis2/config_structs.h"
 #include "camera_aravis2/conversion_utils.h"
 #include "camera_aravis2/image_buffer_pool.h"
+#include <camera_aravis2_msgs/msg/camera_diagnostics.hpp>
 
 namespace camera_aravis2
 {
@@ -99,6 +103,9 @@ class CameraDriverGv : public CameraAravisNodeBase
         /// Control settings for image acquisition.
         AcquisitionControl acquisition_control;
 
+        /// Control settings for analog control.
+        AnalogControl analog_control;
+
         /// URL to camera info yaml file.
         std::string camera_info_url;
 
@@ -121,7 +128,7 @@ class CameraDriverGv : public CameraAravisNodeBase
         std::thread buffer_processing_thread;
 
         /// Concurrent queue holding the buffer data to be processed in a separate thread.
-        ConcurrentQueue<std::tuple<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr>>
+        ConcurrentQueue<std::pair<ArvBuffer*, sensor_msgs::msg::Image::SharedPtr>>
           buffer_queue;
     };
 
@@ -164,7 +171,67 @@ class CameraDriverGv : public CameraAravisNodeBase
     [[nodiscard]] bool setUpCameraStreamStructs();
 
     /**
-     * @brief Get parameter with 'parameter_name' within the list of image format control
+     * @brief Get list of parameters underneath 'param_name' within the list of device
+     * control parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within device control.
+     * The method will prepend 'DeviceControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getDeviceControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
+
+    /**
+     * @brief Set device control settings of the camera.
+     *
+     * For example: DeviceLinkThroughputLimit ...
+     *
+     * @return True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool setDeviceControlSettings();
+
+    /**
+     * @brief Get parameter with 'param_name' within the list of transport layer control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within transport layer control.
+     * The method will prepend 'TransportLayerControl.' to the parameter prior to the search.
+     * @param[out] param_value Parameter value.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getTransportLayerControlParameter(
+      const std::string& param_name,
+      rclcpp::ParameterValue& param_value) const;
+
+    /**
+     * @brief Get list of parameters underneath 'param_name' within the list of transport layer
+     * control parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within transport layer control.
+     * The method will prepend 'TransportLayerControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getTransportLayerControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
+
+    /**
+     * @brief Set transport layer control settings of the camera.
+     *
+     * For example: PtpEnable, GevSCPSPacketSize ...
+     *
+     * @return True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool setTransportLayerControlSettings();
+
+    /**
+     * @brief Get parameter with 'param_name' within the list of image format control
      * parameters.
      *
      * @param[in] param_name Name of the nested parameter within image format control.
@@ -173,9 +240,23 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
      * False otherwise.
      */
-    [[nodiscard]] inline bool getImageFormatControlParameter(
+    [[nodiscard]] bool getImageFormatControlParameter(
       const std::string& param_name,
       rclcpp::ParameterValue& param_value) const;
+
+    /**
+     * @brief Get list of parameters underneath 'param_name' within the list of image format
+     * control parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within image format control.
+     * The method will prepend 'ImageFormatControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getImageFormatControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
 
     /**
      * @brief Set image format control settings of the camera.
@@ -196,9 +277,23 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
      * False otherwise.
      */
-    [[nodiscard]] inline bool getAcquisitionControlParameter(
+    [[nodiscard]] bool getAcquisitionControlParameter(
       const std::string& param_name,
       rclcpp::ParameterValue& param_value) const;
+
+    /**
+     * @brief Get list of parameters underneath 'param_name' within the list of acquisition control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within acquisition control.
+     * The method will prepend 'AcquisitionControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getAcquisitionControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
 
     /**
      * @brief Set acquisition control settings of the camera.
@@ -206,6 +301,41 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @return True if successful. False, otherwise.
      */
     [[nodiscard]] bool setAcquisitionControlSettings();
+
+    /**
+     * @brief Get parameter with 'parameter_name' within the list of analog control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within analog control.
+     * The method will prepend 'AnalogControl.' to the parameter prior to the search.
+     * @param[out] param_value Parameter value.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getAnalogControlParameter(
+      const std::string& param_name,
+      rclcpp::ParameterValue& param_value) const;
+
+    /**
+     * @brief Get list of parameters underneath 'param_name' within the list of analog control
+     * parameters.
+     *
+     * @param[in] param_name Name of the nested parameter within analog control.
+     * The method will prepend 'AnalogControl.' to the parameter prior to the search.
+     * @param[out] param_values List of parameter values associated with feature names.
+     * @return True if parameter is found in 'parameter_overrides_' and, thus, given by the user.
+     * False otherwise.
+     */
+    [[nodiscard]] bool getAnalogControlParameterList(
+      const std::string& param_name,
+      std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const;
+
+    /**
+     * @brief Set analog control settings of the camera.
+     *
+     * @return True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool setAnalogControlSettings();
 
     /**
      * @brief Discover number of available camera streams.
@@ -223,6 +353,45 @@ class CameraDriverGv : public CameraAravisNodeBase
      * @param[in] p_stream Pointer to Aravis Gv stream.
      */
     void tuneGvStream(ArvGvStream* p_stream) const;
+
+#ifdef WITH_MATCHED_EVENTS
+    /**
+     * @brief Handle change in message subscription.
+     *
+     * In this, the image acquisition will be started or stopped, depending on the number of
+     * subscribers.
+     *
+     * This is called each time there is a subscriber change to the image topic, even before the
+     * node is fully initialized. The stored number of subscribers is also evaluated during
+     * initialization in order to start acquisition, if applicable.
+     *
+     * @param[in] iEventInfo Info on matched event.
+     */
+    void handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventInfo);
+#endif
+
+    /**
+     * Set up publisher for camera diagnostics.
+     *
+     * In this, the YAML file configuring the diagnostics which are to be published is read and
+     * parsed.
+     */
+    void setUpCameraDiagnosticPublisher();
+
+    /**
+     * Read and publish camera diagnostics.
+     *
+     * This runs in a separate thread and loops at the given rate to read the stats from the camera
+     * and published them on hte appropriate topic.
+     */
+    void publishCameraDiagnosticsLoop(double rate) const;
+
+    /**
+     * @brief Check the status of the Precision Time Protocol and reset its clock if applicable.     *
+     * The clock will only be reset if the status of PTP is "Faulty", "Disabled", or
+     * "Initializing".
+     */
+    void checkPtp();
 
     /**
      * @brief Process available stream buffer.
@@ -286,6 +455,9 @@ class CameraDriverGv : public CameraAravisNodeBase
     //--- MEMBER DECLARATION ---//
 
   protected:
+    /// Transport layer control settings.
+    TransportLayerControl tl_control_;
+
     /// List of camera streams
     std::vector<Stream> streams_;
 
@@ -295,14 +467,23 @@ class CameraDriverGv : public CameraAravisNodeBase
     /// Thread in which the streams are spawned.
     std::thread spawn_stream_thread_;
 
-    /// List of pointers to data tuples for the new-buffer callback.
-    std::vector<std::shared_ptr<std::tuple<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;
+    /// Atomic flag, indicating if diagnostics are published.
+    std::atomic<bool> is_diagnostics_published_;
 
-    /// Flag indicating verbose output.
-    bool is_verbose_enable_;
+    /// Thead in which the publishing of the camera diagnostics runs.
+    std::thread diagnostic_thread_;
 
-    /// Flag indicating to use PTP timestamp.
-    bool use_ptp_timestamp_;
+    /// Pointer to publisher for camera diagnostics.
+    rclcpp::Publisher<camera_aravis2_msgs::msg::CameraDiagnostics>::SharedPtr p_diagnostic_pub_;
+
+    /// Number of subscribers currently connected to the message topic.
+    int current_num_subscribers_;
+
+    /// YAML node holding diagnostic features
+    YAML::Node diagnostic_features_;
+
+    /// List of pointers to data pair for the new-buffer callback.
+    std::vector<std::shared_ptr<std::pair<CameraDriverGv*, uint>>> new_buffer_cb_data_ptrs;
 
     /// Message strings to warn the user of inconsistencies at summary output.
     std::vector<std::string> config_warn_msgs_;

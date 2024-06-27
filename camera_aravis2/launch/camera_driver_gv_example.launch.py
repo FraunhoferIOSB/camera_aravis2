@@ -43,34 +43,57 @@ os.environ['RCUTILS_CONSOLE_OUTPUT_FORMAT'] = '{time}: [{name}] [{severity}]\t{m
 def generate_launch_description():
 
     example_package_node = Node(
-        name="camera_driver_gv_example",
-        package="camera_aravis2",
-        executable="camera_driver_gv",
+        name='camera_driver_gv_example',
+        package='camera_aravis2',
+        executable='camera_driver_gv',
         output='screen',
         emulate_tty=True,
         # arguments=['--ros-args', '--log-level', 'debug'],
         parameters=[
                 {
                     # Driver-specific parameters
-                    "guid": "Allied Vision-Alvium G1-240c-05P3C",
-                    "frame_id": "camera_gv",
-                    "stream_names": ["vis"],
-                    "camera_info_urls": ["file://" + os.path.join(
+                    'guid': 'Allied Vision-Alvium G1-240c-05P3C',
+                    'frame_id': 'camera_gv',
+                    'stream_names': ['vis'],
+                    'camera_info_urls': ['file://' + os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example.yaml')],
-                    "verbose": False,
+                    'diagnostic_yaml_url': os.path.join(
+                        get_package_share_directory('camera_aravis2'),
+                        'config/camera_diagnostics_example.yaml'),
+                    'verbose': False,
 
                     # GenICam-specific parameters
-                    "ImageFormatControl": {
-                        "PixelFormat": ["BayerRG8", "Mono8"],
-                        "Width": 1920,
-                        "Height": 1200,
+                    'DeviceControl': {
+                        'DeviceLinkThroughputLimit': 125000000,
+                        'DeviceLinkThroughputLimitMode': 'On'
                     },
-                    "AcquisitionControl": {
-                        "ExposureTime": 10000.0,
-                        "ExposureAuto": "Off",
-                        "ExposureMode": "Timed",
-                        "AcquisitionFrameRate": 30.0
+                    'TransportLayerControl': {
+                        'GevSCPSPacketSize': 9000,
+                        'PtpEnable': True
+                    },
+                    'ImageFormatControl': {
+                        'BEGIN': {
+                            'BinningSelector': 'Digital'
+                        },
+                        'PixelFormat': ['BayerRG8', 'Mono8'],
+                        'Width': 1920,
+                        'Height': 1200
+                    },
+                    'AcquisitionControl': {
+                        'ExposureTime': 10000.0,
+                        'ExposureAuto': 'Off',
+                        'ExposureMode': 'Timed',
+                        'AcquisitionFrameRateEnable': True,
+                        'AcquisitionFrameRate': 30.0
+                    },
+                    'AnalogControl': {
+                        'GainAuto': 'Continuous',
+                        'BalanceWhiteAuto': 'Off',
+                        'BalanceRatio': {
+                            'Red': 1.6,
+                            'Blue': 2.0
+                        }
                     }
                 }
             ]

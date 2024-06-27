@@ -41,16 +41,16 @@ os.environ['RCUTILS_CONSOLE_OUTPUT_FORMAT'] = '{time}: [{name}] [{severity}]\t{m
 def generate_launch_description():
 
     example_package_node = Node(
-        name="camera_xml_exporter_example",
-        package="camera_aravis2",
-        executable="camera_xml_exporter",
+        name='camera_xml_exporter_example',
+        package='camera_aravis2',
+        executable='camera_xml_exporter',
         output='screen',
         emulate_tty=True,
         # arguments=['--ros-args', '--log-level', 'debug'],
         parameters=[
                 {
-                  "guid": "Allied Vision-Alvium G1-240c-05P3C",
-                  "xml_file": "genicam_definition.xml"
+                  'guid': 'Allied Vision-Alvium G1-240c-05P3C',
+                  'xml_file': 'genicam_definition.xml'
                 }
             ]
     )
