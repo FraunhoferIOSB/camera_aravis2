@@ -361,9 +361,9 @@ message stated above. If a feature as a list of selectors, one key-value pair is
 
 ## Known Issues
 
-- **Permanent acquisition and publication of image data:**
+- **Permanent acquisition and publication of image data prior to Jazzy Jalisco:**
 With camera_aravis for ROS1, the acquisition and publication of the image data only started when a subscriber has been registered on the image topic and stopped as soon as no subscriber has been registered anymore.
 This helped to minimize unnecessary data transfer. 
 With the so-called [`matched-events`](https://docs.ros.org/en/foxy/Releases/Release-Iron-Irwini.html#matched-events), ROS Iron Irwini has introduced a functionality that allows to do the same. 
-However, since the `image_transport` package for ROS Iron, which is used in `camera_aravis`, does not yet implement this feature.
-This is implemented in `rolling`, however, and is intended for the next release.
+However, the `image_transport` package for ROS Iron, which is used in `camera_aravis`, does not yet implement this feature.
+This feature is only available and implemented sinze ROS Jazzy Jalisco.
