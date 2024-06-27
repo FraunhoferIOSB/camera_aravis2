@@ -354,6 +354,22 @@ class CameraDriverGv : public CameraAravisNodeBase
      */
     void tuneGvStream(ArvGvStream* p_stream) const;
 
+#ifdef WITH_MATCHED_EVENTS
+    /**
+     * @brief Handle change in message subscription.
+     *
+     * In this, the image acquisition will be started or stopped, depending on the number of
+     * subscribers.
+     *
+     * This is called each time there is a subscriber change to the image topic, even before the
+     * node is fully initialized. The stored number of subscribers is also evaluated during
+     * initialization in order to start acquisition, if applicable.
+     *
+     * @param[in] iEventInfo Info on matched event.
+     */
+    void handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventInfo);
+#endif
+
     /**
      * Set up publisher for camera diagnostics.
      *
@@ -459,6 +475,9 @@ class CameraDriverGv : public CameraAravisNodeBase
 
     /// Pointer to publisher for camera diagnostics.
     rclcpp::Publisher<camera_aravis2_msgs::msg::CameraDiagnostics>::SharedPtr p_diagnostic_pub_;
+
+    /// Number of subscribers currently connected to the message topic.
+    int current_num_subscribers_;
 
     /// YAML node holding diagnostic features
     YAML::Node diagnostic_features_;

@@ -55,7 +55,8 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
   CameraAravisNodeBase("camera_driver_gv", options),
   is_spawning_(false),
   is_diagnostics_published_(false),
-  p_diagnostic_pub_(nullptr)
+  p_diagnostic_pub_(nullptr),
+  current_num_subscribers_(0)
 {
     //--- setup parameters
     setUpParameters();
@@ -328,7 +329,17 @@ bool CameraDriverGv::setUpCameraStreamStructs()
             topic_name += "/" + stream.name;
         topic_name += "/image_raw";
 
+#ifndef WITH_MATCHED_EVENTS
         stream.camera_pub = image_transport::create_camera_publisher(this, topic_name);
+#else
+        rclcpp::PublisherOptions pub_options;
+        pub_options.event_callbacks.matched_callback =
+          std::bind(&CameraDriverGv::handleMessageSubscriptionChange, this,
+                    std::placeholders::_1);
+        stream.camera_pub =
+          image_transport::create_camera_publisher(this, topic_name,
+                                                   rmw_qos_profile_default, pub_options);
+#endif
 
         //--- initialize camera_info manager
         // NOTE: Previously, separate node handles where used for CameraInfoManagers in case of a
@@ -1272,9 +1283,21 @@ void CameraDriverGv::spawnCameraStreams()
         arv_stream_set_emit_signals(STREAM.p_arv_stream, TRUE);
     }
 
-    // TODO: Only start acquisition when topic is subscribed
-    arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
-    CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
+#ifndef WITH_MATCHED_EVENTS
+    //--- If matched events are not available, the number of subscribers are not dynamically
+    //--- changed. Thus, set number of subscribers to 1 in order for the acquisition to be started
+    //--- below.
+    current_num_subscribers_ = 1;
+#endif
+
+    //--- When there are already subscribers to the image topic, start acquisition.
+    if (current_num_subscribers_ > 0)
+    {
+        RCLCPP_DEBUG(logger_, "'AcquisitionStart' at initialization.");
+
+        arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
+        CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
+    }
 
     //--- print final output message
     std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
@@ -1319,6 +1342,52 @@ void CameraDriverGv::tuneGvStream(ArvGvStream* p_stream) const
                  "frame-retention", timeout_frame_retention * 1000,
                  NULL);
 }
+
+#ifdef WITH_MATCHED_EVENTS
+//==================================================================================================
+void CameraDriverGv::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventInfo)
+{
+    RCLCPP_DEBUG(logger_, "Handle subscription change.");
+
+    GuardedGError err;
+
+    //--- evaluate whether to start or stop acquisition only if device is available and if the
+    //--- node is initialized.
+    if (p_device_ && this->is_initialized_)
+    {
+        //--- if the new subscriber count of the matched event is greater than 0 and if there were
+        //--- no subscriber so far, start acquisition
+        if (iEventInfo.current_count > 0 && current_num_subscribers_ == 0)
+        {
+            RCLCPP_DEBUG(logger_, "-> Acquisition started.");
+
+            arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
+            CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
+        }
+        //--- if the new subscriber count of the matched event is equal to 0 and if there were
+        //--- subscribers until now, stop acquisition
+        else if (iEventInfo.current_count == 0 && current_num_subscribers_ > 0)
+        {
+            RCLCPP_DEBUG(logger_, "-> Acquisition stopped.");
+
+            arv_device_execute_command(p_device_, "AcquisitionStop", err.ref());
+            CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStop'.");
+        }
+    }
+    else
+    {
+        RCLCPP_DEBUG(logger_, "p_device_ is NULL or node is not initialized.");
+    }
+
+    //--- get the maximum number of subscribers over all streams and assign to the member variable
+    for (uint i = 0; i < streams_.size(); ++i)
+    {
+        current_num_subscribers_ =
+          std::max(static_cast<int>(streams_[i].camera_pub.getNumSubscribers()),
+                   current_num_subscribers_);
+    }
+}
+#endif
 
 //==================================================================================================
 void CameraDriverGv::setUpCameraDiagnosticPublisher()
