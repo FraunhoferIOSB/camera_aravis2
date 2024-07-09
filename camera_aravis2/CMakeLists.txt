@@ -49,8 +49,8 @@ include_directories(include
   ${YAML_CPP_INCLUDE_DIRS}
 )
 
-#if ROS_DISTRO is unequal to iron and humble add define to build with matched events
-if(NOT "$ENV{ROS_DISTRO}" STREQUAL "humble" AND NOT "$ENV{ROS_DISTRO}" STREQUAL "iron")
+#if 'humble' and 'iron' within the rclcpp_DIR path, define to build with matched events
+if(NOT ${rclcpp_DIR} MATCHES ".*/humble/.*" AND NOT ${rclcpp_DIR} MATCHES ".*/iron/.*")
   set(COMMON_COMPILE_DEFINITIONS
     ${COMMON_COMPILE_DEFINITIONS}
     -DWITH_MATCHED_EVENTS

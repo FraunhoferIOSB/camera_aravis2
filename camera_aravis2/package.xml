@@ -10,6 +10,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <build_depend>aravis-dev</build_depend>
+  <build_depend>libglib-dev</build_depend>
 
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
