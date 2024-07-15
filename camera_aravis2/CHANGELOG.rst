@@ -2,8 +2,8 @@
 Changelog for package camera_aravis2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.0 (2024-07-15)
+------------------
 * Implemented GenICam compliant 'camera_driver_gv' for ROS2
 	* Allowing to access a GenICam compliant via its serial number and publishing an image stream
 	* Supporting multiple substreams
