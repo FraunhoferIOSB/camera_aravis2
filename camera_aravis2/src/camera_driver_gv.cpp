@@ -56,7 +56,8 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
   is_spawning_(false),
   is_diagnostics_published_(false),
   p_diagnostic_pub_(nullptr),
-  current_num_subscribers_(0)
+  current_num_subscribers_(0),
+  p_white_balance_srv_(nullptr)
 {
     //--- setup parameters
     setUpParameters();
@@ -94,7 +95,10 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     //--- set analog control settings
     ASSERT_SUCCESS(setAnalogControlSettings());
 
-    //--- laod diagnostics
+    //--- initialize services
+    ASSERT_SUCCESS(initializeServices());
+
+    //--- load diagnostics
     setUpCameraDiagnosticPublisher();
 
     //--- check ptp
@@ -1162,6 +1166,19 @@ bool CameraDriverGv::setUpCameraStreamStructs()
 }
 
 //==================================================================================================
+bool CameraDriverGv::initializeServices()
+{
+    //--- initialize service to calculate white balance
+    p_white_balance_srv_ =
+      this->create_service<camera_aravis2_msgs::srv::CalculateWhiteBalance>(
+        "calculate_white_balance_once",
+        std::bind(&CameraDriverGv::onCalculateWhiteBalanceOnceTriggered, this,
+                  std::placeholders::_1, std::placeholders::_2));
+
+    return true;
+}
+
+//==================================================================================================
 int CameraDriverGv::discoverNumberOfStreams()
 {
     int num_streams = 0;
@@ -2026,6 +2043,61 @@ void CameraDriverGv::printStreamStatistics() const
             RCLCPP_INFO(logger_, "  Resent buffers    = %li", (uint64_t)n_resent);
             RCLCPP_INFO(logger_, "  Missing           = %li", (uint64_t)n_missing);
         }
+    }
+}
+
+//==================================================================================================
+void CameraDriverGv::onCalculateWhiteBalanceOnceTriggered(
+  const std::shared_ptr<camera_aravis2_msgs::srv::CalculateWhiteBalance::Request> req,
+  std::shared_ptr<camera_aravis2_msgs::srv::CalculateWhiteBalance::Response> res) const
+{
+    RCL_UNUSED(req);
+
+    //--- set return values to default
+    res->is_successful = false;
+
+    //--- check for correct state of node
+    if (!p_device_ || !this->is_initialized_)
+        return;
+
+    //--- set white balance mode to 'once' and get calculated values if successful
+    if (setFeatureValue<std::string>("BalanceWhiteAuto", "Once"))
+    {
+        res->is_successful = true;
+
+        RCLCPP_INFO(logger_, "Calculating white balance successful!");
+
+        GuardedGError err;
+        uint nRatioSelectorVals        = 0;
+        const char** ratioSelectorVals = arv_camera_dup_available_enumerations_as_strings(
+          this->p_camera_, "BalanceRatioSelector", &nRatioSelectorVals, err.ref());
+        CHECK_GERROR_MSG(err, logger_,
+                         "In getting values for feature 'BalanceRatioSelector'.");
+
+        for (uint i = 0; i < nRatioSelectorVals; ++i)
+        {
+            diagnostic_msgs::msg::KeyValue kv_pair;
+            kv_pair.key = std::string(ratioSelectorVals[i]);
+
+            setFeatureValue<std::string>("BalanceRatioSelector", kv_pair.key);
+            float ratioVal = 1.0;
+            getFeatureValue<float>("BalanceRatio", ratioVal);
+            kv_pair.value = std::to_string(ratioVal);
+
+            res->balance_ratios.push_back(kv_pair);
+
+            RCLCPP_INFO(logger_, "  BalanceRatio '%s':\t%s",
+                        kv_pair.key.c_str(), kv_pair.value.c_str());
+        }
+
+        return;
+    }
+    else
+    {
+        RCLCPP_ERROR(logger_, "Trying to calculate white balance and setting auto mode to "
+                              "'Once' failed!");
+
+        return;
     }
 }
 

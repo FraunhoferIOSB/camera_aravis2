@@ -49,6 +49,7 @@ extern "C"
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <image_transport/image_transport.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/service.hpp>
 
 // camera_aravis2
 #include "camera_aravis2/camera_aravis_node_base.h"
@@ -57,6 +58,7 @@ extern "C"
 #include "camera_aravis2/conversion_utils.h"
 #include "camera_aravis2/image_buffer_pool.h"
 #include <camera_aravis2_msgs/msg/camera_diagnostics.hpp>
+#include <camera_aravis2_msgs/srv/calculate_white_balance.hpp>
 
 namespace camera_aravis2
 {
@@ -338,6 +340,13 @@ class CameraDriverGv : public CameraAravisNodeBase
     [[nodiscard]] bool setAnalogControlSettings();
 
     /**
+     * @brief Method to initialize service servers.
+     *
+     * @return True if successful. False, otherwise.
+     */
+    [[nodiscard]] bool initializeServices();
+
+    /**
      * @brief Discover number of available camera streams.
      */
     int discoverNumberOfStreams();
@@ -441,6 +450,16 @@ class CameraDriverGv : public CameraAravisNodeBase
      */
     void printStreamStatistics() const;
 
+    /**
+     * @brief Service callback method to calculate white balance once.
+     *
+     * @param[in] req Service request
+     * @param[out] res Service response
+     */
+    void onCalculateWhiteBalanceOnceTriggered(
+      const std::shared_ptr<camera_aravis2_msgs::srv::CalculateWhiteBalance::Request> req,
+      std::shared_ptr<camera_aravis2_msgs::srv::CalculateWhiteBalance::Response> res) const;
+
     //--- FUNCTION DECLARATION ---//
 
   protected:
@@ -487,6 +506,10 @@ class CameraDriverGv : public CameraAravisNodeBase
 
     /// Message strings to warn the user of inconsistencies at summary output.
     std::vector<std::string> config_warn_msgs_;
+
+    /// Service to calculate white balance
+    rclcpp::Service<camera_aravis2_msgs::srv::CalculateWhiteBalance>::SharedPtr
+      p_white_balance_srv_;
 };
 
 }  // namespace camera_aravis2
