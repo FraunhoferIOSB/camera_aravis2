@@ -1,0 +1,26 @@
+image_width: 2048
+image_height: 1536
+camera_name: front
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [ 672.03402,   -0.94396, 1012.89358,
+            0.     ,  671.84822,  764.56529,
+            0.     ,    0.     ,    1.     ]
+distortion_model: equidistant
+distortion_coefficients:
+  rows: 1
+  cols: 4
+  data: [0.107392, -0.331119, 0.609771, -0.201297]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [ 672.03402,   -0.94396, 1012.89358,    0.     ,
+            0.     ,  671.84822,  764.56529,    0.     ,
+            0.     ,    0.     ,    1.     ,    0.     ]

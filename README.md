@@ -32,7 +32,6 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
 - [FAQ](#faq)
     - [How to use PTP](#how-to-use-ptp)
     - [How to set specific analog control values (e.g. balance ratios)](#how-to-set-specific-analog-control-values-eg-balance-ratios)
-    - [How to manually trigger calculation of white balance ratios](#how-to-manually-trigger-calculation-of-white-balance-ratios)
     - [How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)
 - [Known Issues](#known-issues)
 
@@ -341,13 +340,7 @@ For example:
     ...
 ```
 
-### How to manually trigger calculation of white balance ratios
-
-To trigger an automatic white balance computation and a subsequent setting of ```BalanceWhiteAuto``` to ```Once```, camera_aravis2 provides a service called ```calculate_white_balance_once```. 
-Calling this service will trigger a one shot computation of the white balance parameters and return the newly computed balance ratios.
-This can be called no matter which mode has been set previously.
-
-### How to publish camera diagnostics / status
+## How to publish camera diagnostics / status
 
 Camera_aravis allows to periodically monitor custom camera features and publish them in a designated
 topic named ```~/diagnostics``` in a message type as specified in 
