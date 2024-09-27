@@ -73,7 +73,7 @@ CameraDriverUv::CameraDriverUv(const rclcpp::NodeOptions& options) :
     //--- check if GEV Device.
     if (!arv_camera_is_uv_device(p_camera_))
     {
-        RCLCPP_FATAL(logger_, "Camera is no GigE-Vision Device.");
+        RCLCPP_FATAL(logger_, "Camera is no usb3-Vision Device.");
         return;
     }
 
@@ -477,7 +477,7 @@ bool CameraDriverUv::setUpCameraStreamStructs()
 {
     //--- get number of streams and associated names
 
-    int num_streams = discoverNumberOfStreams();
+    int num_streams = 1;//discoverNumberOfStreams();
 
     auto stream_names     = get_parameter("stream_names").as_string_array();
     auto camera_info_urls = get_parameter("camera_info_urls").as_string_array();
@@ -1683,7 +1683,7 @@ void CameraDriverUv::spawnCameraStreams()
                   std::thread(&CameraDriverUv::processStreamBuffer, this, i);
 
                 //tuneUvStream(reinterpret_cast<ArvGvStream*>(stream.p_arv_stream));
-                tuneUvStream(stream.p_arv_stream);
+                //tuneUvStream(stream.p_arv_stream);
 
                 num_opened_streams++;
                 break;

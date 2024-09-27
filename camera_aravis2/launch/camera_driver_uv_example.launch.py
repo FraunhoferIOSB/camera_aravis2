@@ -53,7 +53,8 @@ def generate_launch_description():
                 {
                     # Driver-specific parameters
                     #'guid': 'Daheng Imaging-2BA200003819-FDS23070176',
-                    'guid': 'Daheng Imaging-2BA200003810-FDS23070167',
+                    #'guid': 'Daheng Imaging-2BA200003810-FDS23070167',
+                    'guid': 'Daheng Imaging-2BA200003814-FDS23070171',
                     'frame_id': 'front',
                     'stream_names': ['rgb'],
                     'camera_info_urls': ['file://' + os.path.join(
@@ -74,9 +75,8 @@ def generate_launch_description():
                     #    'PtpEnable': True
                     #},
                     'ImageFormatControl': {
-                        #'BEGIN': {
-                        #    'BinningSelector': 'Digital'
-                        #},
+                        'BEGIN': {                            
+                        },
                         'PixelFormat': ['BayerRG8'],
                         'Width': 2048,
                         'Height': 1536
@@ -85,17 +85,16 @@ def generate_launch_description():
                         'ExposureTime': 10000.0,
                         'ExposureAuto': 'Off',
                         'ExposureMode': 'Timed',
-                        'AcquisitionFrameRateEnable': True,
+                        #'AcquisitionFrameRateEnable': True,
                         'AcquisitionFrameRate': 30.0
                     },
                     'AnalogControl': {
                         'GainAuto': 'Continuous',
-                        'BalanceWhiteAuto': 'Off',
-                        'BalanceRatio': {
-                            'Red': 1.6,
-                            'Blue': 2.0,
-                            'Green':2.0
-                        }
+                        'BalanceWhiteAuto': 'Continuous',
+                        #'BalanceRatio': {
+                        #    'Blue': 2.0,
+                        #    'Green':2.0
+                        #}
                     }
                 }
             ]
