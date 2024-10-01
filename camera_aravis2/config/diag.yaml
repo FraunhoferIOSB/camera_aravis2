@@ -1,0 +1,7 @@
+- FeatureName: DeviceTemperature
+  Type: float
+  Selectors:
+    - FeatureName: DeviceTemperatureSelector
+      Type: string
+      Value: Sensor    
+

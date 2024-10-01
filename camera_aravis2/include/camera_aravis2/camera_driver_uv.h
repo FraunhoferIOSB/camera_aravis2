@@ -349,7 +349,7 @@ class CameraDriverUv : public CameraAravisNodeBase
     /**
      * @brief Tune specific parameters for GigEVision streams.
      *
-     * @param[in] p_stream Pointer to Aravis Gv stream.
+     * @param[in] p_stream Pointer to Aravis Uv stream.
      */
     void tuneUvStream(ArvStream* p_stream) const;
 

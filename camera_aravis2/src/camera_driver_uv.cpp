@@ -73,7 +73,7 @@ CameraDriverUv::CameraDriverUv(const rclcpp::NodeOptions& options) :
     //--- check if GEV Device.
     if (!arv_camera_is_uv_device(p_camera_))
     {
-        RCLCPP_FATAL(logger_, "Camera is no usb3-Vision Device.");
+        RCLCPP_FATAL(logger_, "Camera is no USB3-Vision Device.");
         return;
     }
 
@@ -477,7 +477,8 @@ bool CameraDriverUv::setUpCameraStreamStructs()
 {
     //--- get number of streams and associated names
 
-    int num_streams = 1;//discoverNumberOfStreams();
+    //int num_streams = discoverNumberOfStreams();
+    int num_streams = 1;
 
     auto stream_names     = get_parameter("stream_names").as_string_array();
     auto camera_info_urls = get_parameter("camera_info_urls").as_string_array();
@@ -1308,6 +1309,7 @@ bool CameraDriverUv::setUpCameraStreamStructs()
 
         //--- Acquisition Frame Rate
         //--- only set if it is enabled
+        /*
         tmp_feature_name = "AcquisitionFrameRateEnable";
         RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
                      tmp_feature_name.c_str(), i);
@@ -1320,6 +1322,7 @@ bool CameraDriverUv::setUpCameraStreamStructs()
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
                                         "'" + tmp_feature_name + "' is not as specified.");
 
+        */
         tmp_feature_name = "AcquisitionFrameRate";
         RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
                      tmp_feature_name.c_str(), i);
@@ -1650,60 +1653,66 @@ void CameraDriverUv::spawnCameraStreams()
     // Number of opened streams
     int num_opened_streams = 0;
 
-    for (uint i = 0; i < streams_.size(); i++)
+//for (uint i = 0; i < streams_.size(); i++)
+//{
+//    Stream& stream = streams_[i];
+    Stream& stream = streams_[0];
+
+    RCLCPP_INFO(logger_, "Spawning camera stream with ID %i (%s)", 0,
+                stream.name.c_str());
+
+    const int MAX_RETRIES = 60;
+    int tryCount          = 1;
+    while (is_spawning_ && tryCount <= MAX_RETRIES)
     {
-        Stream& stream = streams_[i];
+        //arv_camera_uv_select_stream_channel(p_camera_, i, err.ref());
+        //stream.p_arv_stream = arv_camera_create_stream(p_camera_, nullptr, nullptr, err.ref());
+        stream.p_arv_stream = arv_camera_create_stream(p_camera_, nullptr, nullptr, err.ref());
+        CHECK_GERROR_MSG(err, logger_, "In creating camera stream.");
 
-        RCLCPP_INFO(logger_, "Spawning camera stream with ID %i (%s)", i,
-                    stream.name.c_str());
-
-        const int MAX_RETRIES = 60;
-        int tryCount          = 1;
-        while (is_spawning_ && tryCount <= MAX_RETRIES)
+        if (ARV_IS_STREAM (stream.p_arv_stream))
         {
-            //arv_camera_uv_select_stream_channel(p_camera_, i, err.ref());
-            stream.p_arv_stream = arv_camera_create_stream(p_camera_, nullptr, nullptr, err.ref());
-            CHECK_GERROR_MSG(err, logger_, "In creating camera stream.");
+            //--- Initialize buffers
 
-            if (stream.p_arv_stream)
-            {
-                //--- Initialize buffers
+            // stream payload size in bytes
+            const auto STREAM_PAYLOAD_SIZE = arv_camera_get_payload(p_camera_, err.ref());
+            CHECK_GERROR_MSG(err, logger_, "In getting payload size of stream.");
 
-                // stream payload size in bytes
-                const auto STREAM_PAYLOAD_SIZE = arv_camera_get_payload(p_camera_, err.ref());
-                CHECK_GERROR_MSG(err, logger_, "In getting payload size of stream.");
+            // TODO: launch parameter for number of preallocated buffers
+            stream.p_buffer_pool.reset(
+                new ImageBufferPool(logger_, stream.p_arv_stream,
+                                    static_cast<guint>(STREAM_PAYLOAD_SIZE), 10));
 
-                // TODO: launch parameter for number of preallocated buffers
-                stream.p_buffer_pool.reset(
-                  new ImageBufferPool(logger_, stream.p_arv_stream,
-                                      static_cast<guint>(STREAM_PAYLOAD_SIZE), 10));
+            stream.is_buffer_processed = true;
+            stream.buffer_processing_thread =
+                std::thread(&CameraDriverUv::processStreamBuffer, this, 0);
 
-                stream.is_buffer_processed = true;
-                stream.buffer_processing_thread =
-                  std::thread(&CameraDriverUv::processStreamBuffer, this, i);
+            //tuneUvStream(reinterpret_cast<ArvGvStream*>(stream.p_arv_stream));
+            //tuneUvStream(stream.p_arv_stream);
 
-                //tuneUvStream(reinterpret_cast<ArvGvStream*>(stream.p_arv_stream));
-                //tuneUvStream(stream.p_arv_stream);
-
-                num_opened_streams++;
-                break;
-            }
-            else
-            {
-                RCLCPP_WARN(logger_, "%s: Could not create image stream with ID %i (%s). "
-                                     "Retrying (%i/%i) ...",
-                            guid_.c_str(), i, stream.name.c_str(),
-                            tryCount, MAX_RETRIES);
-                rclcpp::sleep_for(std::chrono::seconds(1));
-                tryCount++;
-            }
+            num_opened_streams++;
+            break;
         }
-
-        //--- check if stream could be established
-        if (!stream.p_arv_stream)
-            RCLCPP_ERROR(logger_, "%s: Could not create image stream with ID %i (%s).",
-                         guid_.c_str(), i, stream.name.c_str());
+        else
+        {
+            //RCLCPP_WARN(logger_, "%s: Could not create image stream with ID %i (%s). "
+            //                        "Retrying (%i/%i) ...",
+            //            guid_.c_str(), i, stream.name.c_str(),
+            //            tryCount, MAX_RETRIES);
+            RCLCPP_WARN(logger_, "%s: Could not create image stream. "
+                                    "Retrying (%i/%i) ...",
+                        guid_.c_str(),
+                        tryCount, MAX_RETRIES);
+            rclcpp::sleep_for(std::chrono::seconds(1));
+            tryCount++;
+        }
     }
+
+    //--- check if stream could be established
+//    if (!stream.p_arv_stream)
+//        RCLCPP_ERROR(logger_, "%s: Could not create image stream with ID %i (%s).",
+//                        guid_.c_str(), i, stream.name.c_str());
+//}
     is_spawning_ = false;
 
     //--- if no streams are opened, shut down
