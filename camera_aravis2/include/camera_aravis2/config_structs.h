@@ -39,10 +39,22 @@ namespace camera_aravis2
 {
 
 /**
- * @brief Struct holding control settings for transport layer.
+ * @brief Struct holding generic control settings for transport layer.
+ * Subclassing GenTransportLayerControl
  *
  */
-struct TransportLayerControl
+
+struct GenTransportLayerControl
+{
+    virtual ~GenTransportLayerControl() = default;
+};
+
+/**
+ * @brief Struct holding GigE Vision control settings for transport layer.
+ * Subclassing GenTransportLayerControl
+ *
+ */
+struct GvTransportLayerControl : public GenTransportLayerControl
 {
     /// Packet size in bytes.
     int64_t packet_size = 0;
@@ -58,6 +70,15 @@ struct TransportLayerControl
 
     // Offset from the PTP master clock in nanoseconds.
     int64_t ptp_offset = 0;
+};
+
+/**
+ * @brief Struct holding USB Vision control settings for transport layer.
+ * Subclassing GenTransportLayerControl
+ *
+ */
+struct UvTransportLayerControl : public GenTransportLayerControl
+{
 };
 
 /**

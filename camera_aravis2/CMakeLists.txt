@@ -87,6 +87,7 @@ add_library(${LIBRARY_NAME} SHARED
   src/camera_aravis_node_base.cpp
   src/camera_driver_gv.cpp
   src/camera_driver_uv.cpp
+  src/camera_driver.cpp
   src/camera_xml_exporter.cpp
   src/conversion_utils.cpp
   src/error.cpp
