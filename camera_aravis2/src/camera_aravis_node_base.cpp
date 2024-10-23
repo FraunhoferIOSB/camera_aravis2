@@ -98,6 +98,7 @@ void CameraAravisNodeBase::setUpParameters()
     guid_desc.description =
       "Serial number of the camera that is to be opened. If omitted any of the listed cameras "
       "will be opened.";
+    guid_desc.read_only = true;
     declare_parameter<std::string>("guid", "", guid_desc);
 }
 

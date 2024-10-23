@@ -34,6 +34,8 @@
 #include <thread>
 
 // ROS
+#include <rcl_interfaces/msg/floating_point_range.hpp>
+#include <rcl_interfaces/msg/integer_range.hpp>
 #include <rclcpp/time.hpp>
 
 // camera_aravis2
@@ -54,6 +56,7 @@ namespace camera_aravis2
 CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
   CameraAravisNodeBase("camera_driver_gv", options),
   is_spawning_(false),
+  p_parameter_callback_handle_(nullptr),
   is_diagnostics_published_(false),
   p_diagnostic_pub_(nullptr),
   current_num_subscribers_(0),
@@ -97,6 +100,9 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
 
     //--- initialize services
     ASSERT_SUCCESS(initializeServices());
+
+    //--- load dynamic parameters
+    setUpDynamicParameters();
 
     //--- load diagnostics
     setUpCameraDiagnosticPublisher();
@@ -191,6 +197,7 @@ void CameraDriverGv::setUpParameters()
       "to the topic names in order to distinguish the different image "
       "streams. If omitted or less names are given than streams available, "
       "each stream will get given a name based on its ID, starting with 0.";
+    stream_names_desc.read_only = true;
     declare_parameter<std::vector<std::string>>("stream_names", std::vector<std::string>({}),
                                                 stream_names_desc);
 
@@ -204,6 +211,7 @@ void CameraDriverGv::setUpParameters()
       "If omitted, it is constructed from the camera GUID located within the "
       "current working directory, with the stream name separated by '_' appended "
       "to the file name, if more than one streams are instantiated.";
+    camera_info_urls_desc.read_only = true;
     declare_parameter<std::vector<std::string>>("camera_info_urls", std::vector<std::string>({}),
                                                 camera_info_urls_desc);
 
@@ -214,24 +222,40 @@ void CameraDriverGv::setUpParameters()
       "camera, the given ID serves as a base string to which the "
       "stream name is appended, together with '_' as separator. If no "
       "frame ID is specified, the name of the node will be used.";
+    frame_id_desc.read_only = true;
     declare_parameter<std::string>("frame_id", "", frame_id_desc);
+
+    auto dyn_param_yaml_url_desc = rcl_interfaces::msg::ParameterDescriptor{};
+    dyn_param_yaml_url_desc.description =
+      "URL to yaml file specifying camera parameters that are to be made dynamically changeable. "
+      "If left empty (as default) no dynamic parameters, apart from the camera_aravis-specific "
+      "parameters will be available.";
+    dyn_param_yaml_url_desc.read_only = true;
+    declare_parameter<std::string>("dynamic_parameters_yaml_url", "",
+                                   dyn_param_yaml_url_desc);
 
     auto diag_yaml_url_desc = rcl_interfaces::msg::ParameterDescriptor{};
     diag_yaml_url_desc.description =
       "URL to yaml file specifying the camera features which are to be monitored. If left "
       "empty (as default) no diagnostic features will be read and published.";
+    diag_yaml_url_desc.read_only = true;
     declare_parameter<std::string>("diagnostic_yaml_url", "",
                                    diag_yaml_url_desc);
 
     auto diag_pub_rate_desc = rcl_interfaces::msg::ParameterDescriptor{};
     diag_pub_rate_desc.description =
       "Rate at which to read and publish the diagnostic data.";
+    diag_pub_rate_desc.read_only = true;
     declare_parameter<double>("diagnostic_publishing_rate", 0.1, diag_pub_rate_desc);
 
     auto verbose_desc = rcl_interfaces::msg::ParameterDescriptor{};
     verbose_desc.description =
       "Activate verbose output.";
     declare_parameter<bool>("verbose", false, verbose_desc);
+
+    //--- register parameter change callback
+    p_parameter_callback_handle_ = add_on_set_parameters_callback(
+      std::bind(&CameraDriverGv::handleDynamicParameterChange, this, std::placeholders::_1));
 }
 
 //==================================================================================================
@@ -1364,8 +1388,6 @@ void CameraDriverGv::tuneGvStream(ArvGvStream* p_stream) const
 //==================================================================================================
 void CameraDriverGv::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventInfo)
 {
-    RCLCPP_DEBUG(logger_, "Handle subscription change.");
-
     GuardedGError err;
 
     //--- evaluate whether to start or stop acquisition only if device is available and if the
@@ -1405,6 +1427,268 @@ void CameraDriverGv::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEvent
     }
 }
 #endif
+
+//==================================================================================================
+void CameraDriverGv::setUpDynamicParameters()
+{
+    GuardedGError err;
+
+    //--- get file url
+    auto dyn_param_yaml_url_ = get_parameter("dynamic_parameters_yaml_url").as_string();
+
+    //--- read diagnostic features from yaml file and initialize publishing thread
+    if (!dyn_param_yaml_url_.empty())
+    {
+        YAML::Node dyn_params;
+
+        try
+        {
+            dyn_params = YAML::LoadFile(dyn_param_yaml_url_);
+        }
+        catch (const YAML::BadFile& e)
+        {
+            config_warn_msgs_.push_back("YAML file cannot be loaded: " + std::string(e.what()));
+            config_warn_msgs_.push_back("Dynamic parameters will not be available.");
+            return;
+        }
+        catch (const YAML::ParserException& e)
+        {
+            config_warn_msgs_.push_back("YAML file is malformed: " + std::string(e.what()));
+            config_warn_msgs_.push_back("Dynamic parameters will not be available.");
+            return;
+        }
+
+        //--- if parameters are available in list, declare parameter accordingly.
+        if (dyn_params.size() > 0)
+        {
+            int feature_idx = 1;
+
+            //--- loop through feature list and get specified information
+            for (auto feature_dict : dyn_params)
+            {
+                std::string feature_name = feature_dict["FeatureName"].IsDefined()
+                                             ? feature_dict["FeatureName"].as<std::string>()
+                                             : "";
+                std::string feature_type = feature_dict["Type"].IsDefined()
+                                             ? feature_dict["Type"].as<std::string>()
+                                             : "";
+
+                if (feature_name.empty() || feature_type.empty())
+                {
+                    config_warn_msgs_.push_back(
+                      "Dynamic parameter at index " +
+                      std::to_string(feature_idx) +
+                      " does not have a field 'FeatureName' or 'Type'. "
+                      "Parameter will be skipped.");
+                }
+                else
+                {
+
+                    if (!arv_device_is_feature_available(p_device_, feature_name.c_str(),
+                                                         err.ref()))
+                    {
+                        config_warn_msgs_.push_back(
+                          "Dynamic parameter with 'FeatureName' '" + feature_name +
+                          " cannot be declared as feature is not available on "
+                          "device.");
+                    }
+                    else
+                    {
+                        //--- if feature is available on device, declare it a parameter that can
+                        //--- dynamically be changed
+
+                        //--- convert type string to lower case
+                        std::transform(feature_type.begin(), feature_type.end(),
+                                       feature_type.begin(), [](unsigned char c)
+                                       { return std::tolower(c); });
+
+                        //--- floating point type
+                        if (feature_type == "float" || feature_type == "double")
+                        {
+                            //--- set description
+                            auto param_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+                            param_desc.description = feature_dict["Description"].as<std::string>();
+
+                            //--- get bounds from device and from yaml file,
+                            //--- and choose the intersection of both
+                            rcl_interfaces::msg::FloatingPointRange fpRange;
+                            fpRange.from_value = DBL_MIN;
+                            fpRange.to_value   = DBL_MAX;
+                            arv_device_get_float_feature_bounds(p_device_, feature_name.c_str(),
+                                                                &fpRange.from_value,
+                                                                &fpRange.to_value,
+                                                                err.ref());
+
+                            if (feature_dict["Min"].IsDefined())
+                                fpRange.from_value = std::max(fpRange.from_value,
+                                                              feature_dict["Min"].as<double>());
+                            if (feature_dict["Max"].IsDefined())
+                                fpRange.to_value = std::min(fpRange.to_value,
+                                                            feature_dict["Max"].as<double>());
+
+                            fpRange.step =
+                              arv_device_get_float_feature_increment(
+                                p_device_, feature_name.c_str(), err.ref());
+
+                            if (fpRange.from_value != INT_MIN && fpRange.to_value != INT_MAX)
+                                param_desc.floating_point_range = {fpRange};
+
+                            //--- get current value as default and restrict it to 3 chars after
+                            //--- decimal point
+                            float defVal = 0;
+                            getFeatureValue<float>(feature_name, defVal);
+                            int defVal_int = static_cast<int>(defVal * 1000.f);
+                            defVal         = static_cast<float>(defVal_int) / 1000;
+
+                            //--- declare parameter
+                            declare_parameter<float>(feature_name, defVal, param_desc);
+                        }
+                        //--- integer type
+                        else if (feature_type == "int")
+                        {
+                            //--- set description
+                            auto param_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+                            param_desc.description = feature_dict["Description"].as<std::string>();
+
+                            //--- get bounds from device and from yaml file,
+                            //--- and choose the intersection of both
+                            rcl_interfaces::msg::IntegerRange intRange;
+                            intRange.from_value = INT_MIN;
+                            intRange.to_value   = INT_MAX;
+                            arv_device_get_integer_feature_bounds(p_device_, feature_name.c_str(),
+                                                                  &intRange.from_value,
+                                                                  &intRange.to_value,
+                                                                  err.ref());
+
+                            if (feature_dict["Min"].IsDefined())
+                                intRange.from_value = std::max(
+                                  static_cast<int>(intRange.from_value),
+                                  feature_dict["Min"].as<int>());
+                            if (feature_dict["Max"].IsDefined())
+                                intRange.to_value = std::min(
+                                  static_cast<int>(intRange.to_value),
+                                  feature_dict["Max"].as<int>());
+
+                            intRange.step =
+                              arv_device_get_float_feature_increment(
+                                p_device_, feature_name.c_str(), err.ref());
+
+                            //--- get current value as default
+                            int defVal = 0;
+                            getFeatureValue<int>(feature_name, defVal);
+
+                            //--- declare parameter
+                            declare_parameter<int>(feature_name, defVal, param_desc);
+                        }
+                        //--- bool type
+                        else if (feature_type == "bool")
+                        {
+                            //--- set description
+                            auto param_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+                            param_desc.description = feature_dict["Description"].as<std::string>();
+
+                            //--- get current value as default
+                            bool defVal = false;
+                            getFeatureValue<bool>(feature_name, defVal);
+
+                            //--- declare parameter
+                            declare_parameter<bool>(feature_name, defVal, param_desc);
+                        }
+                        //--- string or other type
+                        else
+                        {
+                            //--- set description
+                            auto param_desc        = rcl_interfaces::msg::ParameterDescriptor{};
+                            param_desc.description = feature_dict["Description"].as<std::string>();
+
+                            //--- get current value as default
+                            std::string defVal = "";
+                            getFeatureValue<std::string>(feature_name, defVal);
+
+                            //--- declare parameter
+                            declare_parameter<std::string>(feature_name, defVal, param_desc);
+                        }
+
+                        dynamic_parameters_names_.push_back(feature_name);
+                    }
+
+                    CHECK_GERROR_MSG(err, logger_,
+                                     "In setting dynamic parameter '" + feature_name + "'.");
+                }
+
+                feature_idx++;
+            }
+        }
+        else
+        {
+            config_warn_msgs_.push_back(
+              "YAML file for dynamic parameters with no features specified.");
+            config_warn_msgs_.push_back("Dynamic parameters will not be available.");
+            return;
+        }
+    }
+}
+
+//==================================================================================================
+rcl_interfaces::msg::SetParametersResult CameraDriverGv::handleDynamicParameterChange(
+  const std::vector<rclcpp::Parameter>& iParameters)
+{
+
+    RCLCPP_DEBUG(logger_, "%s", __PRETTY_FUNCTION__);
+
+    // Return value that holds information on success.
+    rcl_interfaces::msg::SetParametersResult retVal;
+    retVal.successful = true;
+
+    //-- loop through all parameters and set information accordingly
+    for (rclcpp::Parameter param : iParameters)
+    {
+        // parameter name (i.e. feature name)
+        std::string param_name = param.get_name();
+
+        //--- verbose
+        if (param_name == "verbose")
+        {
+            is_verbose_enable_ = param.as_bool();
+        }
+        //--- dynamic camera parameters, check if parameter name is in list of specified dynamic
+        //--- parameters
+        else if (std::find(dynamic_parameters_names_.begin(), dynamic_parameters_names_.end(),
+                           param_name) != dynamic_parameters_names_.end())
+        {
+            switch (param.get_type())
+            {
+            case rclcpp::PARAMETER_STRING:
+                retVal.successful &=
+                  setFeatureValue<std::string>(param_name, param.get_value<std::string>());
+                break;
+
+            case rclcpp::PARAMETER_BOOL:
+                retVal.successful &=
+                  setFeatureValue<bool>(param_name, param.get_value<bool>());
+                break;
+
+            case rclcpp::PARAMETER_INTEGER:
+                retVal.successful &=
+                  setFeatureValue<int>(param_name, param.get_value<int>());
+                break;
+
+            case rclcpp::PARAMETER_DOUBLE:
+                retVal.successful &=
+                  setFeatureValue<double>(param_name, param.get_value<double>());
+                break;
+
+            default:
+                RCLCPP_WARN(logger_, "Dynamic parameter is of invalid type '%s'",
+                            param_name.c_str());
+                retVal.successful &= false;
+                break;
+            }
+        }
+    }
+
+    return retVal;
+}
 
 //==================================================================================================
 void CameraDriverGv::setUpCameraDiagnosticPublisher()
@@ -1463,8 +1747,6 @@ void CameraDriverGv::setUpCameraDiagnosticPublisher()
 //==================================================================================================
 void CameraDriverGv::publishCameraDiagnosticsLoop(double rate) const
 {
-    RCLCPP_WARN(logger_, "Publishing camera diagnostics at %g Hz", rate);
-
     camera_aravis2_msgs::msg::CameraDiagnostics cam_diagnostic_msg;
     cam_diagnostic_msg.header.frame_id = this->get_name();
 

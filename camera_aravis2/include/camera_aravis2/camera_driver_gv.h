@@ -48,6 +48,7 @@ extern "C"
 // ROS
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <image_transport/image_transport.hpp>
+#include <rcl_interfaces/msg/set_parameters_result.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/service.hpp>
 
@@ -380,6 +381,24 @@ class CameraDriverGv : public CameraAravisNodeBase
 #endif
 
     /**
+     * @brief Load and set up dynamic parameters.
+     *
+     * This will read the yaml file (if specified) which holds the parameters that are to be made
+     * dynamically changeable and declare them.
+     */
+    void setUpDynamicParameters();
+
+    /**
+     * @brief Handle dynamic change of parameters. For example, through rqt_reconfigure.
+     *
+     * This loops through the list of parameters in iParameters and sets their value accordingly.
+     *
+     * @param[in] iParameters Parameters that have changed.
+     */
+    rcl_interfaces::msg::SetParametersResult handleDynamicParameterChange(
+      const std::vector<rclcpp::Parameter>& iParameters);
+
+    /**
      * Set up publisher for camera diagnostics.
      *
      * In this, the YAML file configuring the diagnostics which are to be published is read and
@@ -486,10 +505,16 @@ class CameraDriverGv : public CameraAravisNodeBase
     /// Thread in which the streams are spawned.
     std::thread spawn_stream_thread_;
 
+    /// Callback handle to adjust parameters
+    OnSetParametersCallbackHandle::SharedPtr p_parameter_callback_handle_;
+
+    /// List of the specified dynamic parameter names.
+    std::vector<std::string> dynamic_parameters_names_;
+
     /// Atomic flag, indicating if diagnostics are published.
     std::atomic<bool> is_diagnostics_published_;
 
-    /// Thead in which the publishing of the camera diagnostics runs.
+    /// Thread in which the publishing of the camera diagnostics runs.
     std::thread diagnostic_thread_;
 
     /// Pointer to publisher for camera diagnostics.

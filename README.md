@@ -66,6 +66,10 @@ The configuration of the camera driver is divided into a driver-specific and Gen
     - Type: String
     - Default: ""
     - Optional. If no frame ID is specified, the name of the node will be used.
+- ```dynamic_parameters_yaml_url```: URL to yaml file specifying camera parameters that are to be made dynamically changeable.  See '[How to dynamically change camera parameters](#how-to-dynamically-change-camera-parameters)' for more info.
+	- Type: String
+	- Default: ""
+    - Optional. If left empty no dynamic parameters, apart from the camera_aravis-specific parameters will be available
 - ```diagnostic_yaml_url```: URL to yaml file specifying the camera features which are to be 
 monitored. See '[How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)' for more info.
 	- Type: String
@@ -346,6 +350,33 @@ For example:
 To trigger an automatic white balance computation and a subsequent setting of ```BalanceWhiteAuto``` to ```Once```, camera_aravis2 provides a service called ```calculate_white_balance_once```. 
 Calling this service will trigger a one shot computation of the white balance parameters and return the newly computed balance ratios.
 This can be called no matter which mode has been set previously.
+
+### How to dynamically change camera parameters
+
+Camera_aravis allows to customize the camera parameters that are to be made dynamically changeable, for example, by utilizing ```rqt_reconfigure```.
+The parameters that are to be changed dynamically can be specified within a yaml file which, in turn, is to be passed to camera_aravis through the [launch parameter](#driver-specific-parameters):
+- 'dynamic_parameters_yaml_url'.
+
+This file should hold a list of 
+```FeatureName```, representing the camera parameter that is to be changed, together with a corresponding ```Type``` (bool, float, int, or string).
+In addition to the feature name and the type an optional ```Description``` can be specified.
+Furthermore, for integer and floating point parameters a lower and upper bound can optionally be specified through the fields ```Min``` and ```Max```.
+
+For example, the following snippet will declare the parameter 'AcquisitionFrameRate' as dynamically changeable and set the possible value range to [0.1, 50.0]:
+```Yaml
+    ...
+    - FeatureName: AcquisitionFrameRate
+      Type: float
+      Min: 0.1
+      Max: 50.0
+      Description: Controls the acquisition rate (in Hertz) at which the frames are captured.
+    ...
+```
+
+During the declaration of floating point or integer parameters, camera_aravis will additionally try to extract the lower and upper bounds of the feature from the device and compare it to the possibly declared bounds by the user. 
+In this, camera_aravis will set the intersection of both ranges as the range for the corresponding parameter.
+
+An example of this yaml file is given in [dynamic_parameters_example.yaml](camera_aravis2/config/dynamic_parameters_example.yaml).
 
 ### How to publish camera diagnostics / status
 
