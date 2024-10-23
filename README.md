@@ -33,6 +33,7 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
     - [How to use PTP](#how-to-use-ptp)
     - [How to set specific analog control values (e.g. balance ratios)](#how-to-set-specific-analog-control-values-eg-balance-ratios)
     - [How to manually trigger calculation of white balance ratios](#how-to-manually-trigger-calculation-of-white-balance-ratios)
+    - [How to dynamically change camera parameters](#how-to-dynamically-change-camera-parameters)
     - [How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)
 - [Known Issues](#known-issues)
 
