@@ -1483,7 +1483,6 @@ void CameraDriverGv::setUpDynamicParameters()
                 }
                 else
                 {
-
                     if (!arv_device_is_feature_available(p_device_, feature_name.c_str(),
                                                          err.ref()))
                     {
@@ -1633,7 +1632,6 @@ void CameraDriverGv::setUpDynamicParameters()
 rcl_interfaces::msg::SetParametersResult CameraDriverGv::handleDynamicParameterChange(
   const std::vector<rclcpp::Parameter>& iParameters)
 {
-
     RCLCPP_DEBUG(logger_, "%s", __PRETTY_FUNCTION__);
 
     // Return value that holds information on success.
