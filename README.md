@@ -8,6 +8,8 @@ It relies on the [Aravis](http://live.gnome.org/Aravis) library to access the Gi
 Aravis is a glib/gobject based library for video acquisition using GenICam cameras. 
 It currently implements the gigabit ethernet and USB3 protocols used by industrial cameras.
 
+**Acknowledgement**: This software was developed as part of the project [ROBDEKON – Robotic Systems for Decontamination in Hazardous Environments](https://robdekon.de/), funded by the Federal Ministry of Education and Research (BMBF) under the German Federal Government’s Research for Civil Security program.
+
 ------------------------
 
 ### Continuous Integration:
