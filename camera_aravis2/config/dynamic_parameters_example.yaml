@@ -6,4 +6,3 @@
 - FeatureName: PtpEnable
   Type: bool
   Description: Enables the Precision Time Protocol (PTP).
-

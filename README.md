@@ -43,7 +43,7 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
 
 In camera_aravis2 the actual camera driver is implemented in two nodes:
 - `camera_driver_gv` for GigEVision cameras, and
-- `camera_driver_uv`, for USB3Vision cameras. **(Currently only implemented as stub. Looking for help: [Support USB3 cameras](https://github.com/FraunhoferIOSB/camera_aravis2/issues/14))**
+- `camera_driver_uv`, for USB3Vision cameras.
 
 ### Configuration
 
@@ -90,10 +90,10 @@ If specified as launch parameter, camera_aravis2 will set the following features
 - `DeviceControl` (List): GenICam parameters of the 'DeviceControl' category that are to be set. Here, no specific order is implemented. Nested parameter list is evaluated in alphabetical order.
 - `TransportLayerControl`
     - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
-    - `GevSCPSPacketSize` (Int): Specifies the packet size, in bytes, which are to be send. This should correspond 'DeviceStreamChannelPacketSize' and the maximum transport unit (MTU) of the interface.
-    - `GevSCPD` (Int): Controls the delay (in GEV timestamp counter unit) to insert between
+    - `GevSCPSPacketSize` (Int) - *GigEVision Cameras only* : Specifies the packet size, in bytes, which are to be send. This should correspond 'DeviceStreamChannelPacketSize' and the maximum transport unit (MTU) of the interface.
+    - `GevSCPD` (Int) - *GigEVision Cameras only* : Controls the delay (in GEV timestamp counter unit) to insert between
 each packet for this stream channel.
-    - `PtpEnable` (Bool): Enables the Precision Time Protocol (PTP).
+    - `PtpEnable` (Bool) - *GigEVision Cameras only* : Enables the Precision Time Protocol (PTP).
     - `END` (List): Additional GenICam parameters that are not be set at the end of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
 - `ImageFormatControl`
     - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
@@ -199,6 +199,8 @@ To find the features that are available for configuration on the camera, togethe
 
 - ```camera_driver_gv```: [camera_aravis2/launch/camera_driver_gv_example.launch.py](./camera_aravis2/launch/camera_driver_gv_example.launch.py)
 
+- ```camera_driver_uv```: [camera_aravis2/launch/camera_driver_uv_example.launch.py](./camera_aravis2/launch/camera_driver_uv_example.launch.py)
+
 ## Finding Available Cameras
 
 Camera_aravis2 provides the node `camera_finder` to find available cameras and print out the corresponding GUIDs.
@@ -300,7 +302,9 @@ colcon test-result --all
 
 ### How to use PTP
 
-Some cameras support the use of the Precision Time Protocol (PTP) to set the timestamps of the captured images. To activate and use it just set the launch parameter 'TransportLayerControl.PtpEnable' to 'True' as seen blow:
+*GigEVision Cameras Only*
+
+Some GigEVision cameras support the use of the Precision Time Protocol (PTP) to set the timestamps of the captured images. To activate and use it just set the launch parameter 'TransportLayerControl.PtpEnable' to 'True' as seen blow:
 
 ```Python
     ...
@@ -347,7 +351,6 @@ For example:
 ```
 
 ### How to manually trigger calculation of white balance ratios
-
 To trigger an automatic white balance computation and a subsequent setting of ```BalanceWhiteAuto``` to ```Once```, camera_aravis2 provides a service called ```calculate_white_balance_once```. 
 Calling this service will trigger a one shot computation of the white balance parameters and return the newly computed balance ratios.
 This can be called no matter which mode has been set previously.

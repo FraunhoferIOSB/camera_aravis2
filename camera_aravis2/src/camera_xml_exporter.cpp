@@ -46,7 +46,7 @@ CameraXmlExporter::CameraXmlExporter(const rclcpp::NodeOptions& options) :
   xml_file_path_("")
 {
     //--- setup parameters
-    setUpParameters();
+    setupParameters();
 
     //--- open camera device
     ASSERT_SUCCESS(discoverAndOpenCameraDevice());
@@ -67,10 +67,10 @@ CameraXmlExporter::~CameraXmlExporter()
 }
 
 //==================================================================================================
-void CameraXmlExporter::setUpParameters()
+void CameraXmlExporter::setupParameters()
 {
     //--- call method of parent class
-    CameraAravisNodeBase::setUpParameters();
+    CameraAravisNodeBase::setupParameters();
 
     auto xmlFile_desc = rcl_interfaces::msg::ParameterDescriptor{};
     xmlFile_desc.description =

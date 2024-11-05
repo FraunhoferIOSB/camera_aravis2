@@ -99,7 +99,7 @@ class CameraAravisNodeBase : public rclcpp::Node
     /**
      * @brief Set the up launch parameters.
      */
-    virtual void setUpParameters();
+    virtual void setupParameters();
 
     /**
      * @brief Discover attached camera devices found by Aravis and open device specified by guid.

@@ -92,7 +92,7 @@ bool CameraAravisNodeBase::isInitialized() const
 }
 
 //==================================================================================================
-void CameraAravisNodeBase::setUpParameters()
+void CameraAravisNodeBase::setupParameters()
 {
     auto guid_desc = rcl_interfaces::msg::ParameterDescriptor{};
     guid_desc.description =
