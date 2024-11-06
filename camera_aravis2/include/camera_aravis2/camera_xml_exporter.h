@@ -65,7 +65,7 @@ class CameraXmlExporter : public CameraAravisNodeBase
      * @overload
      * @brief Set the up launch parameters.
      */
-    void setUpParameters() override;
+    void setupParameters() override;
 
     /**
      * @brief Export XML data from camera and write to file.

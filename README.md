@@ -8,6 +8,8 @@ It relies on the [Aravis](http://live.gnome.org/Aravis) library to access the Gi
 Aravis is a glib/gobject based library for video acquisition using GenICam cameras. 
 It currently implements the gigabit ethernet and USB3 protocols used by industrial cameras.
 
+**Acknowledgement**: This software was developed as part of the project [ROBDEKON – Robotic Systems for Decontamination in Hazardous Environments](https://robdekon.de/), funded by the Federal Ministry of Education and Research (BMBF) under the German Federal Government’s Research for Civil Security program.
+
 ------------------------
 
 ### Continuous Integration:
@@ -32,6 +34,8 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
 - [FAQ](#faq)
     - [How to use PTP](#how-to-use-ptp)
     - [How to set specific analog control values (e.g. balance ratios)](#how-to-set-specific-analog-control-values-eg-balance-ratios)
+    - [How to manually trigger calculation of white balance ratios](#how-to-manually-trigger-calculation-of-white-balance-ratios)
+    - [How to dynamically change camera parameters](#how-to-dynamically-change-camera-parameters)
     - [How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)
 - [Known Issues](#known-issues)
 
@@ -41,7 +45,7 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
 
 In camera_aravis2 the actual camera driver is implemented in two nodes:
 - `camera_driver_gv` for GigEVision cameras, and
-- `camera_driver_uv`, for USB3Vision cameras. **(Currently only implemented as stub. Looking for help: [Support USB3 cameras](https://github.com/FraunhoferIOSB/camera_aravis2/issues/14))**
+- `camera_driver_uv`, for USB3Vision cameras.
 
 ### Configuration
 
@@ -65,6 +69,10 @@ The configuration of the camera driver is divided into a driver-specific and Gen
     - Type: String
     - Default: ""
     - Optional. If no frame ID is specified, the name of the node will be used.
+- ```dynamic_parameters_yaml_url```: URL to yaml file specifying camera parameters that are to be made dynamically changeable.  See '[How to dynamically change camera parameters](#how-to-dynamically-change-camera-parameters)' for more info.
+	- Type: String
+	- Default: ""
+    - Optional. If left empty no dynamic parameters, apart from the camera_aravis-specific parameters will be available
 - ```diagnostic_yaml_url```: URL to yaml file specifying the camera features which are to be 
 monitored. See '[How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)' for more info.
 	- Type: String
@@ -84,10 +92,10 @@ If specified as launch parameter, camera_aravis2 will set the following features
 - `DeviceControl` (List): GenICam parameters of the 'DeviceControl' category that are to be set. Here, no specific order is implemented. Nested parameter list is evaluated in alphabetical order.
 - `TransportLayerControl`
     - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
-    - `GevSCPSPacketSize` (Int): Specifies the packet size, in bytes, which are to be send. This should correspond 'DeviceStreamChannelPacketSize' and the maximum transport unit (MTU) of the interface.
-    - `GevSCPD` (Int): Controls the delay (in GEV timestamp counter unit) to insert between
+    - `GevSCPSPacketSize` (Int) - *GigEVision Cameras only* : Specifies the packet size, in bytes, which are to be send. This should correspond 'DeviceStreamChannelPacketSize' and the maximum transport unit (MTU) of the interface.
+    - `GevSCPD` (Int) - *GigEVision Cameras only* : Controls the delay (in GEV timestamp counter unit) to insert between
 each packet for this stream channel.
-    - `PtpEnable` (Bool): Enables the Precision Time Protocol (PTP).
+    - `PtpEnable` (Bool) - *GigEVision Cameras only* : Enables the Precision Time Protocol (PTP).
     - `END` (List): Additional GenICam parameters that are not be set at the end of the 'TransportLayerControl' section. Nested parameter list is evaluated in alphabetical order.
 - `ImageFormatControl`
     - `BEGIN` (List): Additional GenICam parameters that are not be set at the beginning of the 'ImageFormatControl' section. Nested parameter list is evaluated in alphabetical order.
@@ -193,6 +201,8 @@ To find the features that are available for configuration on the camera, togethe
 
 - ```camera_driver_gv```: [camera_aravis2/launch/camera_driver_gv_example.launch.py](./camera_aravis2/launch/camera_driver_gv_example.launch.py)
 
+- ```camera_driver_uv```: [camera_aravis2/launch/camera_driver_uv_example.launch.py](./camera_aravis2/launch/camera_driver_uv_example.launch.py)
+
 ## Finding Available Cameras
 
 Camera_aravis2 provides the node `camera_finder` to find available cameras and print out the corresponding GUIDs.
@@ -294,7 +304,9 @@ colcon test-result --all
 
 ### How to use PTP
 
-Some cameras support the use of the Precision Time Protocol (PTP) to set the timestamps of the captured images. To activate and use it just set the launch parameter 'TransportLayerControl.PtpEnable' to 'True' as seen blow:
+*GigEVision Cameras Only*
+
+Some GigEVision cameras support the use of the Precision Time Protocol (PTP) to set the timestamps of the captured images. To activate and use it just set the launch parameter 'TransportLayerControl.PtpEnable' to 'True' as seen blow:
 
 ```Python
     ...
@@ -340,7 +352,39 @@ For example:
     ...
 ```
 
-## How to publish camera diagnostics / status
+### How to manually trigger calculation of white balance ratios
+To trigger an automatic white balance computation and a subsequent setting of ```BalanceWhiteAuto``` to ```Once```, camera_aravis2 provides a service called ```calculate_white_balance_once```. 
+Calling this service will trigger a one shot computation of the white balance parameters and return the newly computed balance ratios.
+This can be called no matter which mode has been set previously.
+
+### How to dynamically change camera parameters
+
+Camera_aravis allows to customize the camera parameters that are to be made dynamically changeable, for example, by utilizing ```rqt_reconfigure```.
+The parameters that are to be changed dynamically can be specified within a yaml file which, in turn, is to be passed to camera_aravis through the [launch parameter](#driver-specific-parameters):
+- 'dynamic_parameters_yaml_url'.
+
+This file should hold a list of 
+```FeatureName```, representing the camera parameter that is to be changed, together with a corresponding ```Type``` (bool, float, int, or string).
+In addition to the feature name and the type an optional ```Description``` can be specified.
+Furthermore, for integer and floating point parameters a lower and upper bound can optionally be specified through the fields ```Min``` and ```Max```.
+
+For example, the following snippet will declare the parameter 'AcquisitionFrameRate' as dynamically changeable and set the possible value range to [0.1, 50.0]:
+```Yaml
+    ...
+    - FeatureName: AcquisitionFrameRate
+      Type: float
+      Min: 0.1
+      Max: 50.0
+      Description: Controls the acquisition rate (in Hertz) at which the frames are captured.
+    ...
+```
+
+During the declaration of floating point or integer parameters, camera_aravis will additionally try to extract the lower and upper bounds of the feature from the device and compare it to the possibly declared bounds by the user. 
+In this, camera_aravis will set the intersection of both ranges as the range for the corresponding parameter.
+
+An example of this yaml file is given in [dynamic_parameters_example.yaml](camera_aravis2/config/dynamic_parameters_example.yaml).
+
+### How to publish camera diagnostics / status
 
 Camera_aravis allows to periodically monitor custom camera features and publish them in a designated
 topic named ```~/diagnostics``` in a message type as specified in 
