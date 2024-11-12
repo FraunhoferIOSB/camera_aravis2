@@ -299,6 +299,11 @@ class CameraAravisNodeBase : public rclcpp::Node
 
   protected:
     /**
+     * @brief Check if given string is an IP Adress.
+     */
+    static bool isIpAddress(const std::string& str);
+
+    /**
      * @brief Construct GUID string of given camera, using vendor name, model name and
      * device serial number.
      *

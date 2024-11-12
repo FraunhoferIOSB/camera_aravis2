@@ -29,6 +29,8 @@
 #include "camera_aravis2/camera_aravis_node_base.h"
 
 // Std
+#include <regex>
+#include <string>
 #include <type_traits>
 
 // camera_aravis2
@@ -57,6 +59,7 @@ CameraAravisNodeBase::~CameraAravisNodeBase()
     if (p_camera_)
         g_object_unref(p_camera_);
 
+    arv_shutdown();
     RCLCPP_INFO(logger_, "Node has shut down.");
 }
 
@@ -84,9 +87,11 @@ bool CameraAravisNodeBase::isInitialized() const
     RCLCPP_INFO(logger_, "Attached cameras (Num. Interfaces: %d | Num. Devices: %d):",
                 n_interfaces, n_devices);
     for (uint i = 0; i < n_devices; i++)
+    {
         RCLCPP_INFO(logger_, "  Device %d: %s (%s)", i,
                     arv_get_device_id(i),
                     arv_get_device_address(i));
+    }
 
     return true;
 }
@@ -665,6 +670,21 @@ bool CameraAravisNodeBase::executeCommand(const std::string& feature_name) const
                       "In executing command '" + feature_name + "'.", is_successful);
 
     return is_successful;
+}
+
+//==================================================================================================
+bool CameraAravisNodeBase::isIpAddress(const std::string& str)
+{
+    //--- Regular expression for an IPv4 address
+    //--- 25[0-5] allows values between 250-255
+    //--- 2[0-4][0-9] allows values between 200-249
+    //--- [01]?[0-9][0-9] allows values between 0-199
+    //--- this is repeated three times with a succeeding .
+    //--- (\b ... \b) ensures that the whole expression is considered
+    std::regex ipv4Regex(
+      R"((\b(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b)");
+
+    return std::regex_match(str, ipv4Regex);
 }
 
 //==================================================================================================

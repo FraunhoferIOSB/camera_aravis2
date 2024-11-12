@@ -1706,6 +1706,8 @@ void CameraDriver::spawnCameraStreams()
     std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
     RCLCPP_INFO(logger_, "Done initializing.");
     RCLCPP_INFO(logger_, "  Camera:        %s", camera_guid_str.c_str());
+    if (arv_camera_is_gv_device(p_camera_) && CameraAravisNodeBase::isIpAddress(guid_))
+        RCLCPP_INFO(logger_, "  IP:            %s", guid_.c_str());
     RCLCPP_INFO(logger_, "  Num. Streams:  (%i / %i)",
                 num_opened_streams, static_cast<int>(streams_.size()));
 
@@ -1874,10 +1876,12 @@ void CameraDriver::printCameraConfiguration() const
     rclcpp::ParameterValue tmp_param_value;
     std::vector<std::pair<std::string, rclcpp::ParameterValue>> tmp_param_values;
 
+    std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
+
     RCLCPP_INFO(logger_, "======================================");
     RCLCPP_INFO(logger_, "Camera Configuration:");
     RCLCPP_INFO(logger_, "--------------------------------------");
-    RCLCPP_INFO(logger_, "  GUID:                  %s", guid_.c_str());
+    RCLCPP_INFO(logger_, "  GUID:                  %s", camera_guid_str.c_str());
     if (is_verbose_enable_)
     {
         RCLCPP_INFO(logger_, "  Type:                  %s",
