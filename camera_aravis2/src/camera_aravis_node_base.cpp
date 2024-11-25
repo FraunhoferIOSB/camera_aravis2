@@ -402,7 +402,7 @@ bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string& feature_nam
 
     T boundedValue = std::max(*min, std::min(value, *max));
 
-    return setFeatureValue<T>(feature_name, boundedValue);
+    return setFeatureValue<T>(feature_name, boundedValue) && is_successful;
 }
 template bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string&, const int64_t&,
                                                            int64_t*, int64_t*) const;
