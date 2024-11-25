@@ -2076,7 +2076,7 @@ void CameraDriver::printCameraConfiguration() const
 
     for (std::string warn_msg : config_warn_msgs_)
     {
-        RCLCPP_WARN(logger_, warn_msg.c_str());
+        RCLCPP_WARN(logger_, "%s", warn_msg.c_str());
     }
 }
 
