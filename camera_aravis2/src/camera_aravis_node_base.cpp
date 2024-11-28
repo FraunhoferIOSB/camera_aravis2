@@ -405,6 +405,9 @@ bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string& feature_nam
     ASSERT_GERROR_MSG(err, logger_,
                       "In setting value for feature '" + feature_name + "'.", is_successful);
 
+    if (!is_successful)
+        return false;
+
     T boundedValue = std::max(*min, std::min(value, *max));
 
     return setFeatureValue<T>(feature_name, boundedValue);

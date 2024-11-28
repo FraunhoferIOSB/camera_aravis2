@@ -1195,7 +1195,7 @@ void CameraDriver::setupDynamicParameters()
                               arv_device_get_float_feature_increment(
                                 p_device_, feature_name.c_str(), err.ref());
 
-                            if (fpRange.from_value != INT_MIN && fpRange.to_value != INT_MAX)
+                            if (fpRange.from_value != DBL_MIN && fpRange.to_value != DBL_MAX)
                                 param_desc.floating_point_range = {fpRange};
 
                             //--- get current value as default and restrict it to 3 chars after
@@ -1237,6 +1237,9 @@ void CameraDriver::setupDynamicParameters()
                             intRange.step =
                               arv_device_get_float_feature_increment(
                                 p_device_, feature_name.c_str(), err.ref());
+
+                            if (intRange.from_value != INT_MIN && intRange.to_value != INT_MAX)
+                                param_desc.integer_range = {intRange};
 
                             //--- get current value as default
                             int defVal = 0;
@@ -2080,7 +2083,7 @@ void CameraDriver::printCameraConfiguration() const
 
     for (std::string warn_msg : config_warn_msgs_)
     {
-        RCLCPP_WARN(logger_, warn_msg.c_str());
+        RCLCPP_WARN(logger_, "%s", warn_msg.c_str());
     }
 }
 
