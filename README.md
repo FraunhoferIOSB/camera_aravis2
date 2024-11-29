@@ -41,6 +41,7 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
     - [How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)
     - [How to access GigEVision camera using the IP address](#how-to-access-gigevision-camera-using-the-ip-address)
 - [Known Issues](#known-issues)
+- [Contributing](CONTRIBUTING.md)
 
 ------------------------
 
