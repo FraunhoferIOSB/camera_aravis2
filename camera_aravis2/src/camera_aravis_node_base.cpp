@@ -635,7 +635,10 @@ bool CameraAravisNodeBase::isParameterValueEqualTo(const rclcpp::ParameterValue&
         return false;
     }
 
-    return (value == test_value);
+    if constexpr (std::is_same_v<T, double>)
+        return (std::abs(value - test_value) < 0.0001);
+    else
+        return (value == test_value);
 }
 template bool CameraAravisNodeBase::isParameterValueEqualTo<bool>(
   const rclcpp::ParameterValue&, const bool&, const uint&) const;
