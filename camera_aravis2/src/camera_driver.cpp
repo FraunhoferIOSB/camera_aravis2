@@ -1191,9 +1191,7 @@ void CameraDriver::setupDynamicParameters()
                                 fpRange.to_value = std::min(fpRange.to_value,
                                                             feature_dict["Max"].as<double>());
 
-                            fpRange.step =
-                              arv_device_get_float_feature_increment(
-                                p_device_, feature_name.c_str(), err.ref());
+                            fpRange.step = 0;
 
                             if (fpRange.from_value != DBL_MIN && fpRange.to_value != DBL_MAX)
                                 param_desc.floating_point_range = {fpRange};
@@ -1234,9 +1232,7 @@ void CameraDriver::setupDynamicParameters()
                                   static_cast<int>(intRange.to_value),
                                   feature_dict["Max"].as<int>());
 
-                            intRange.step =
-                              arv_device_get_float_feature_increment(
-                                p_device_, feature_name.c_str(), err.ref());
+                            intRange.step = 0;
 
                             if (intRange.from_value != INT_MIN && intRange.to_value != INT_MAX)
                                 param_desc.integer_range = {intRange};
