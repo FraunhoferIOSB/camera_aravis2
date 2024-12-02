@@ -1085,6 +1085,7 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
     }
 
     //--- get the maximum number of subscribers over all streams and assign to the member variable
+    current_num_subscribers_ = 0;
     for (uint i = 0; i < streams_.size(); ++i)
     {
         current_num_subscribers_ =
