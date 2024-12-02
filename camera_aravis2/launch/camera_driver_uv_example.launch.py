@@ -55,7 +55,7 @@ def generate_launch_description():
                     'guid': 'IDS Imaging Development Systems GmbH-1409f4a3c131-4104372529',
                     'frame_id': 'camera_uv',
                     'stream_names': ['vis'],
-                    'camera_info_urls': ['file://' + os.path.join(
+                    'camera_info_urls': [os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example_uv.yaml')],
                     'dynamic_parameters_yaml_url': os.path.join(

@@ -229,7 +229,7 @@ bool CameraDriver::setupCameraStreamStructs()
             stream.camera_info_url = camera_info_urls[i];
 
             //--- add 'file://' to beginning of camera_info_url
-            if (stream.camera_info_url.find_first_of("file://") != 0)
+            if (stream.camera_info_url.find("file://") != 0)
                 stream.camera_info_url = "file://" + stream.camera_info_url;
         }
 
