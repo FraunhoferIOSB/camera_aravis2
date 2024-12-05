@@ -41,6 +41,7 @@ Each top line of a commit should be made up of a type and a subject
 Allowed types:
 
 *   **feat**: A new feature
+*   **enhance**: An enhancement to the current feature set
 *   **fix**: A bug fix
 *   **docs**: Documentation only changes
 *   **style**: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, newline, line endings, etc)
