@@ -35,8 +35,14 @@
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<camera_aravis2::CameraXmlExporter>();
+
+    auto p_node        = std::make_shared<camera_aravis2::CameraXmlExporter>();
+    bool is_successful = p_node->export_xml_data_to_file();
+
     rclcpp::shutdown();
 
-    return EXIT_SUCCESS;
+    if (is_successful)
+        return EXIT_SUCCESS;
+    else
+        return EXIT_FAILURE;
 }

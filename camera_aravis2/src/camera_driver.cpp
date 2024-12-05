@@ -61,9 +61,9 @@ CameraDriver::~CameraDriver()
 }
 
 //==================================================================================================
-bool CameraDriver::isSpawningOrInitialized() const
+bool CameraDriver::isSpawning() const
 {
-    return (is_spawning_ || is_initialized_);
+    return (is_spawning_);
 }
 
 //==================================================================================================
