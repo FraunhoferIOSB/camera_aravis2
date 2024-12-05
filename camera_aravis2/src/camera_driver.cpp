@@ -1064,7 +1064,7 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
         //--- no subscriber so far, start acquisition
         if (iEventInfo.current_count > 0 && current_num_subscribers_ == 0)
         {
-            RCLCPP_DEBUG(logger_, "-> Acquisition started.");
+            RCLCPP_INFO(logger_, "-> Acquisition start.");
 
             arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
             CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
@@ -1073,7 +1073,7 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
         //--- subscribers until now, stop acquisition
         else if (iEventInfo.current_count == 0 && current_num_subscribers_ > 0)
         {
-            RCLCPP_DEBUG(logger_, "-> Acquisition stopped.");
+            RCLCPP_INFO(logger_, "-> Acquisition stop.");
 
             arv_device_execute_command(p_device_, "AcquisitionStop", err.ref());
             CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStop'.");
@@ -1081,7 +1081,9 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
     }
     else
     {
-        RCLCPP_DEBUG(logger_, "p_device_ is NULL or node is not initialized.");
+        RCLCPP_WARN(logger_, "Subscription change detected but no action taken. "
+                             "Reason: p_device_ is NULL or node is not initialized.");
+        return;
     }
 
     //--- get the maximum number of subscribers over all streams and assign to the member variable
@@ -1686,6 +1688,15 @@ void CameraDriver::spawnCameraStreams()
         arv_stream_set_emit_signals(STREAM.p_arv_stream, TRUE);
     }
 
+    //--- print final output message
+    std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
+    RCLCPP_INFO(logger_, "Done initializing.");
+    RCLCPP_INFO(logger_, "  Camera:        %s", camera_guid_str.c_str());
+    if (arv_camera_is_gv_device(p_camera_) && CameraAravisNodeBase::isIpAddress(guid_))
+        RCLCPP_INFO(logger_, "  IP:            %s", guid_.c_str());
+    RCLCPP_INFO(logger_, "  Num. Streams:  (%i / %i)",
+                num_opened_streams, static_cast<int>(streams_.size()));
+
 #ifndef WITH_MATCHED_EVENTS
     //--- If matched events are not available, the number of subscribers are not dynamically
     //--- changed. Thus, set number of subscribers to 1 in order for the acquisition to be started
@@ -1696,20 +1707,11 @@ void CameraDriver::spawnCameraStreams()
     //--- When there are already subscribers to the image topic, start acquisition.
     if (current_num_subscribers_ > 0)
     {
-        RCLCPP_DEBUG(logger_, "'AcquisitionStart' at initialization.");
+        RCLCPP_INFO(logger_, "-> Acquisition start at initialization.");
 
         arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
         CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
     }
-
-    //--- print final output message
-    std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
-    RCLCPP_INFO(logger_, "Done initializing.");
-    RCLCPP_INFO(logger_, "  Camera:        %s", camera_guid_str.c_str());
-    if (arv_camera_is_gv_device(p_camera_) && CameraAravisNodeBase::isIpAddress(guid_))
-        RCLCPP_INFO(logger_, "  IP:            %s", guid_.c_str());
-    RCLCPP_INFO(logger_, "  Num. Streams:  (%i / %i)",
-                num_opened_streams, static_cast<int>(streams_.size()));
 
     this->is_initialized_ = true;
 }

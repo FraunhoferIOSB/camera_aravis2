@@ -118,6 +118,8 @@ CameraDriverGv::~CameraDriverGv()
     //--- stop acquisition
     if (p_device_)
     {
+        RCLCPP_INFO(logger_, "-> Acquisition stop.");
+
         arv_device_execute_command(p_device_, "AcquisitionStop", err.ref());
         CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStop'.");
     }
