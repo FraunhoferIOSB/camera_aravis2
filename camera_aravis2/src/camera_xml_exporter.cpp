@@ -54,11 +54,7 @@ CameraXmlExporter::CameraXmlExporter(const rclcpp::NodeOptions& options) :
     std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
     RCLCPP_INFO(logger_, "Successfully Opened: %s", camera_guid_str.c_str());
 
-    //--- export XML data to file
-    ASSERT_SUCCESS(export_xml_data_to_file());
-
-    RCLCPP_INFO(logger_, "Written GenICam XML to file: %s",
-                std::filesystem::canonical(xml_file_path_).c_str());
+    is_initialized_ = true;
 }
 
 //==================================================================================================
@@ -67,21 +63,14 @@ CameraXmlExporter::~CameraXmlExporter()
 }
 
 //==================================================================================================
-void CameraXmlExporter::setupParameters()
+[[nodiscard]] bool CameraXmlExporter::exportXmlDataToFile()
 {
-    //--- call method of parent class
-    CameraAravisNodeBase::setupParameters();
+    if (!is_initialized_)
+    {
+        RCLCPP_ERROR(logger_, "'%s' is not initialized.", this->get_name());
+        return false;
+    }
 
-    auto xmlFile_desc = rcl_interfaces::msg::ParameterDescriptor{};
-    xmlFile_desc.description =
-      "Path to XML output file. If omitted, the XML data will be written into file with GUID as "
-      "file name.";
-    declare_parameter<std::string>("xml_file", "", xmlFile_desc);
-}
-
-//==================================================================================================
-[[nodiscard]] bool CameraXmlExporter::export_xml_data_to_file()
-{
     /// Path string of output xml file.
     std::string xml_file_str = get_parameter("xml_file").as_string();
 
@@ -122,7 +111,23 @@ void CameraXmlExporter::setupParameters()
     fout.write(p_xml_data, xml_size);
     fout.close();
 
+    RCLCPP_INFO(logger_, "Written GenICam XML to file: %s",
+                std::filesystem::canonical(xml_file_path_).c_str());
+
     return true;
+}
+
+//==================================================================================================
+void CameraXmlExporter::setupParameters()
+{
+    //--- call method of parent class
+    CameraAravisNodeBase::setupParameters();
+
+    auto xmlFile_desc = rcl_interfaces::msg::ParameterDescriptor{};
+    xmlFile_desc.description =
+      "Path to XML output file. If omitted, the XML data will be written into file with GUID as "
+      "file name.";
+    declare_parameter<std::string>("xml_file", "", xmlFile_desc);
 }
 
 }  // end namespace camera_aravis2

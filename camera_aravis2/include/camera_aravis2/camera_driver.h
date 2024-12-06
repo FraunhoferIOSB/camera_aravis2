@@ -160,9 +160,9 @@ class CameraDriver : public CameraAravisNodeBase
     virtual ~CameraDriver();
 
     /**
-     * @brief Returns true, if node is spawning or is initialized. False, otherwise.
+     * @brief Returns true, if node is spawning. False, otherwise.
      */
-    bool isSpawningOrInitialized() const;
+    bool isSpawning() const;
 
   protected:
     /**

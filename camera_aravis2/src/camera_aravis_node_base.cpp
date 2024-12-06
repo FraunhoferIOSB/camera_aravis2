@@ -70,7 +70,7 @@ bool CameraAravisNodeBase::isInitialized() const
 }
 
 //==================================================================================================
-[[nodiscard]] bool CameraAravisNodeBase::listAvailableCameraDevices() const
+uint CameraAravisNodeBase::listAvailableCameraDevices() const
 {
     //--- Discover available interfaces and devices.
 
@@ -78,22 +78,23 @@ bool CameraAravisNodeBase::isInitialized() const
     auto n_interfaces = arv_get_n_interfaces();
     auto n_devices    = arv_get_n_devices();
 
-    if (n_devices == 0)
+    if (n_devices > 0)
+    {
+        RCLCPP_INFO(logger_, "Attached cameras (Num. Interfaces: %d | Num. Devices: %d):",
+                    n_interfaces, n_devices);
+        for (uint i = 0; i < n_devices; i++)
+        {
+            RCLCPP_INFO(logger_, "  Device %d: %s (%s)", i,
+                        arv_get_device_id(i),
+                        arv_get_device_address(i));
+        }
+    }
+    else
     {
         RCLCPP_FATAL(logger_, "No cameras detected.");
-        return false;
     }
 
-    RCLCPP_INFO(logger_, "Attached cameras (Num. Interfaces: %d | Num. Devices: %d):",
-                n_interfaces, n_devices);
-    for (uint i = 0; i < n_devices; i++)
-    {
-        RCLCPP_INFO(logger_, "  Device %d: %s (%s)", i,
-                    arv_get_device_id(i),
-                    arv_get_device_address(i));
-    }
-
-    return true;
+    return n_devices;
 }
 
 //==================================================================================================
@@ -115,8 +116,8 @@ void CameraAravisNodeBase::setupParameters()
 
     //--- Discover available interfaces and devices.
 
-    bool is_successful = listAvailableCameraDevices();
-    if (!is_successful)
+    uint n_devices = listAvailableCameraDevices();
+    if (n_devices == 0)
         return false;
 
     //--- connect to camera specified by guid parameter
