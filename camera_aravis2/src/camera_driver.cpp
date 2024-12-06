@@ -1666,7 +1666,7 @@ void CameraDriver::spawnCameraStreams()
     {
         RCLCPP_FATAL(logger_, "Failed to open streams for camera %s.",
                      guid_.c_str());
-        ASSERT_SUCCESS(false);
+        return;
     }
 
     //--- Connect signals with callbacks and activate emission of signals
