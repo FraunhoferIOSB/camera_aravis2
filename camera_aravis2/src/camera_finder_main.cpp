@@ -36,13 +36,12 @@ int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 
-    auto p_node        = std::make_shared<camera_aravis2::CameraAravisNodeBase>("camera_finder");
-    bool is_successful = p_node->listAvailableCameraDevices();
+    auto p_node = std::make_shared<camera_aravis2::CameraAravisNodeBase>("camera_finder");
+
+    if (p_node)
+        p_node->listAvailableCameraDevices();
 
     rclcpp::shutdown();
 
-    if (is_successful)
-        return EXIT_SUCCESS;
-    else
-        return EXIT_FAILURE;
+    return p_node ? EXIT_SUCCESS : EXIT_FAILURE;
 }

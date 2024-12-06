@@ -65,7 +65,7 @@ class CameraXmlExporter : public CameraAravisNodeBase
      *
      * @return True if successful. False, otherwise.
      */
-    [[nodiscard]] bool export_xml_data_to_file();
+    [[nodiscard]] bool exportXmlDataToFile();
 
   protected:
     /**

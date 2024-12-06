@@ -63,7 +63,7 @@ CameraXmlExporter::~CameraXmlExporter()
 }
 
 //==================================================================================================
-[[nodiscard]] bool CameraXmlExporter::export_xml_data_to_file()
+[[nodiscard]] bool CameraXmlExporter::exportXmlDataToFile()
 {
     if (!is_initialized_)
     {

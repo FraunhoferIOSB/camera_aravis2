@@ -37,18 +37,20 @@ int main(int argc, char** argv)
     rclcpp::init(argc, argv);
 
     auto p_node = std::make_shared<camera_aravis2::CameraDriverUv>();
-    if (p_node->isSpawning() || p_node->isInitialized())
-    {
-        rclcpp::spin(p_node->get_node_base_interface());
-    }
 
-    //--- check if driver was initialized, i.e. if it has successfully spawned a camera stream
-    bool is_successful = p_node->isInitialized();
+    bool is_successful = false;
+    if (p_node)
+    {
+        if (p_node->isSpawning() || p_node->isInitialized())
+        {
+            rclcpp::spin(p_node->get_node_base_interface());
+        }
+
+        //--- check if driver was initialized, i.e. if it has successfully spawned a camera stream
+        is_successful = p_node->isInitialized();
+    }
 
     rclcpp::shutdown();
 
-    if (is_successful)
-        return EXIT_SUCCESS;
-    else
-        return EXIT_FAILURE;
+    return is_successful ? EXIT_SUCCESS : EXIT_FAILURE;
 }

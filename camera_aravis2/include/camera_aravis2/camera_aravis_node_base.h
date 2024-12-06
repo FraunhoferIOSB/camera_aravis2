@@ -92,8 +92,9 @@ class CameraAravisNodeBase : public rclcpp::Node
     /**
      * @brief List available camera devices.
      *
+     * @return Number of available devices.
      */
-    [[nodiscard]] bool listAvailableCameraDevices() const;
+    uint listAvailableCameraDevices() const;
 
   protected:
     /**

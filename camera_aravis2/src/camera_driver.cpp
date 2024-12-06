@@ -1064,7 +1064,7 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
         //--- no subscriber so far, start acquisition
         if (iEventInfo.current_count > 0 && current_num_subscribers_ == 0)
         {
-            RCLCPP_INFO(logger_, "-> Acquisition start.");
+            RCLCPP_INFO(logger_, "|-> Acquisition start.");
 
             arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
             CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
@@ -1073,7 +1073,7 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
         //--- subscribers until now, stop acquisition
         else if (iEventInfo.current_count == 0 && current_num_subscribers_ > 0)
         {
-            RCLCPP_INFO(logger_, "-> Acquisition stop.");
+            RCLCPP_INFO(logger_, "->| Acquisition stop.");
 
             arv_device_execute_command(p_device_, "AcquisitionStop", err.ref());
             CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStop'.");
@@ -1707,7 +1707,7 @@ void CameraDriver::spawnCameraStreams()
     //--- When there are already subscribers to the image topic, start acquisition.
     if (current_num_subscribers_ > 0)
     {
-        RCLCPP_INFO(logger_, "-> Acquisition start at initialization.");
+        RCLCPP_INFO(logger_, "|-> Acquisition start at initialization.");
 
         arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
         CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
