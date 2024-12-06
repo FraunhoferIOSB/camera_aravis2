@@ -49,7 +49,7 @@ CameraXmlExporter::CameraXmlExporter(const rclcpp::NodeOptions& options) :
     setupParameters();
 
     //--- open camera device
-    ASSERT_SUCCESS(discoverAndOpenCameraDevice());
+    ASSERT_SUCCESS(discoverAndOpenCameraDevice(), logger_);
 
     std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
     RCLCPP_INFO(logger_, "Successfully Opened: %s", camera_guid_str.c_str());
