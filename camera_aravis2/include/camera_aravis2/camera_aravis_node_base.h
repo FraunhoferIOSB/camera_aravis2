@@ -30,6 +30,7 @@
 #define CAMERA_ARAVIS2__CAMERA_ARAVIS_NODE_BASE_H_
 
 // Std
+#include <cassert>
 #include <map>
 #include <string>
 #include <utility>
@@ -48,17 +49,12 @@ extern "C"
 #include "camera_aravis2/error.h"
 
 // Macro to assert success of given function
-#define ASSERT_SUCCESS(fn) \
-    if (!fn)               \
-    {                      \
-        return;            \
-    }
-// Macro to assert success of given function and shut down if not successful
-#define ASSERT_SUCCESS_AND_SHUTDOWN(fn) \
-    if (!fn)                            \
-    {                                   \
-        rclcpp::shutdown();             \
-        return;                         \
+#define ASSERT_SUCCESS(fn)                                                  \
+    if (!fn)                                                                \
+    {                                                                       \
+        RCLCPP_FATAL(logger_, "%s:%i: Assertion on success of '%s' failed", \
+                     __FILE__, __LINE__, #fn);                              \
+        return;                                                             \
     }
 
 namespace camera_aravis2
