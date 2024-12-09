@@ -58,7 +58,7 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     parameter_overrides_ = this->get_node_parameters_interface()->get_parameter_overrides();
 
     //--- open camera device
-    ASSERT_SUCCESS(discoverAndOpenCameraDevice(), logger_);
+    CHECK_SUCCESS(discoverAndOpenCameraDevice(), logger_);
 
     //--- check if GEV Device.
     if (!arv_camera_is_gv_device(p_camera_))
@@ -68,28 +68,28 @@ CameraDriverGv::CameraDriverGv(const rclcpp::NodeOptions& options) :
     }
 
     //--- set up structs holding relevant information of camera streams
-    ASSERT_SUCCESS(setupCameraStreamStructs(), logger_);
+    CHECK_SUCCESS(setupCameraStreamStructs(), logger_);
 
     //--- set device control settings
-    ASSERT_SUCCESS(setDeviceControlSettings(), logger_);
+    CHECK_SUCCESS(setDeviceControlSettings(), logger_);
 
     //--- set transport layer control settings
     p_gv_tl_control_ = std::make_shared<GvTransportLayerControl>();
     p_tl_control_    = std::dynamic_pointer_cast<GenTransportLayerControl>(p_gv_tl_control_);
 
-    ASSERT_SUCCESS(setTransportLayerControlSettings(), logger_);
+    CHECK_SUCCESS(setTransportLayerControlSettings(), logger_);
 
     //--- set image format control settings
-    ASSERT_SUCCESS(setImageFormatControlSettings(), logger_);
+    CHECK_SUCCESS(setImageFormatControlSettings(), logger_);
 
     //--- set acquisition control settings
-    ASSERT_SUCCESS(setAcquisitionControlSettings(), logger_);
+    CHECK_SUCCESS(setAcquisitionControlSettings(), logger_);
 
     //--- set analog control settings
-    ASSERT_SUCCESS(setAnalogControlSettings(), logger_);
+    CHECK_SUCCESS(setAnalogControlSettings(), logger_);
 
     //--- initialize services
-    ASSERT_SUCCESS(initializeServices(), logger_);
+    CHECK_SUCCESS(initializeServices(), logger_);
 
     //--- load dynamic parameters
     setupDynamicParameters();

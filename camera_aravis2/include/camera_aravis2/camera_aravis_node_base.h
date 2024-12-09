@@ -49,7 +49,7 @@ extern "C"
 #include "camera_aravis2/error.h"
 
 // Macro to assert success of given function
-#define ASSERT_SUCCESS(expr, logger)                                        \
+#define CHECK_SUCCESS(expr, logger)                                         \
     if (!expr)                                                              \
     {                                                                       \
         RCLCPP_FATAL(logger, "%s:%i: Assertion on success of '%s' failed.", \

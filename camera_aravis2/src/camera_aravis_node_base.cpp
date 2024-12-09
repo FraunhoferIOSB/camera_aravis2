@@ -263,8 +263,8 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
                     typeid(T).name());
     }
 
-    ASSERT_GERROR_MSG(err, logger_,
-                      "In getting value for feature '" + feature_name + "'.", is_successful);
+    CHECK_SUCCESS_GERROR_MSG(err, logger_,
+                             "In getting value for feature '" + feature_name + "'.", is_successful);
 
     return is_successful;
 }
@@ -293,7 +293,7 @@ bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, cons
     {
         RCLCPP_WARN(logger_, "Feature '%s' is not available. Value will not be set.",
                     feature_name.c_str());
-        ASSERT_GERROR(err, logger_, is_successful);
+        CHECK_SUCCESS_GERROR(err, logger_, is_successful);
         return false;
     }
 
@@ -331,8 +331,8 @@ bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, cons
                     typeid(T).name());
     }
 
-    ASSERT_GERROR_MSG(err, logger_,
-                      "In setting value for feature '" + feature_name + "'.", is_successful);
+    CHECK_SUCCESS_GERROR_MSG(err, logger_,
+                             "In setting value for feature '" + feature_name + "'.", is_successful);
 
     return is_successful;
 }
@@ -384,7 +384,7 @@ bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string& feature_nam
     {
         RCLCPP_WARN(logger_, "Feature '%s' is not available. Value will not be set.",
                     feature_name.c_str());
-        ASSERT_GERROR(err, logger_, is_successful);
+        CHECK_SUCCESS_GERROR(err, logger_, is_successful);
         return false;
     }
 
@@ -403,8 +403,8 @@ bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string& feature_nam
                     typeid(T).name());
     }
 
-    ASSERT_GERROR_MSG(err, logger_,
-                      "In setting value for feature '" + feature_name + "'.", is_successful);
+    CHECK_SUCCESS_GERROR_MSG(err, logger_,
+                             "In setting value for feature '" + feature_name + "'.", is_successful);
 
     if (!is_successful)
         return false;
@@ -667,14 +667,14 @@ bool CameraAravisNodeBase::executeCommand(const std::string& feature_name) const
     {
         RCLCPP_WARN(logger_, "Command '%s' is not available. Value will not be executed.",
                     feature_name.c_str());
-        ASSERT_GERROR(err, logger_, is_successful);
+        CHECK_SUCCESS_GERROR(err, logger_, is_successful);
         return false;
     }
 
     arv_device_execute_command(p_device_, feature_name.c_str(), err.ref());
 
-    ASSERT_GERROR_MSG(err, logger_,
-                      "In executing command '" + feature_name + "'.", is_successful);
+    CHECK_SUCCESS_GERROR_MSG(err, logger_,
+                             "In executing command '" + feature_name + "'.", is_successful);
 
     return is_successful;
 }
