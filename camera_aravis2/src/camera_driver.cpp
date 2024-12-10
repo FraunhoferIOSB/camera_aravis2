@@ -445,7 +445,7 @@ bool CameraDriver::setupCameraStreamStructs()
         //--- get bits per pixel
         sensor.n_bits_pixel =
           ARV_PIXEL_FORMAT_BIT_PER_PIXEL(arv_camera_get_pixel_format(p_camera_, err.ref()));
-        ASSERT_GERROR_MSG(err, logger_, "In getting 'Bits per Pixel'.", is_successful);
+        CHECK_SUCCESS_GERROR_MSG(err, logger_, "In getting 'Bits per Pixel'.", is_successful);
 
         //--- get sensor size
         RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.SensorWidth' and "
@@ -1472,7 +1472,7 @@ void CameraDriver::publishCameraDiagnosticsLoop(double rate) const
         GuardedGError err;
         bool is_feature_available =
           arv_device_is_feature_available(p_device_, name.c_str(), err.ref());
-        ASSERT_GERROR(err, logger_, is_successful)
+        CHECK_SUCCESS_GERROR(err, logger_, is_successful)
 
         return (is_feature_available && is_successful);
     };
@@ -1666,7 +1666,7 @@ void CameraDriver::spawnCameraStreams()
     {
         RCLCPP_FATAL(logger_, "Failed to open streams for camera %s.",
                      guid_.c_str());
-        ASSERT_SUCCESS(false);
+        return;
     }
 
     //--- Connect signals with callbacks and activate emission of signals
