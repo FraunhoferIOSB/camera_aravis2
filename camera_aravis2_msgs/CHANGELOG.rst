@@ -2,6 +2,13 @@
 Changelog for package camera_aravis2_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Update maintainer -> Raphael Hagmanns
+* Added dynamic paramters.
+* Added service to manually trigger computation of white balance.
+* Contributors: Boitumelo Ruf
+
 1.0.0 (2024-07-15)
 ------------------
 * Added camera_aravis2 specific messages

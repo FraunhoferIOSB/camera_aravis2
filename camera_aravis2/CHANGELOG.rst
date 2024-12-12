@@ -2,6 +2,23 @@
 Changelog for package camera_aravis2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Update maintainer -> Raphael Hagmanns
+* Enhance: Improved assertions and error messages
+* Fix: added failure exit code to nodes
+* Enhance: changed message of acquisition start/stop to info-level
+* Fix: calculation of ROS topic subscriber count -> fix start/stop acquisition
+* Fix: added epsilon in the comparison between double values
+* Fix: handling of missing 'file://' in camera_info_url
+* Fix: Adjusted step of integer and fp range
+* Feat: Added support to access GigEVision cameras via IP address.
+* Feat: Support for USB3 Cameras.
+* Feat: Added functionally do specify parameters that are to be made dynamically changeable.
+* Added service to manually trigger computation of white balance.
+* Minor changes and bug fixes
+* Contributors: Boitumelo Ruf, Louis-Romain JOLY, Ralph Ursprung
+
 1.0.0 (2024-07-15)
 ------------------
 * Implemented GenICam compliant 'camera_driver_gv' for ROS2
