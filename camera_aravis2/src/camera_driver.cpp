@@ -61,9 +61,9 @@ CameraDriver::~CameraDriver()
 }
 
 //==================================================================================================
-bool CameraDriver::isSpawningOrInitialized() const
+bool CameraDriver::isSpawning() const
 {
-    return (is_spawning_ || is_initialized_);
+    return (is_spawning_);
 }
 
 //==================================================================================================
@@ -229,7 +229,7 @@ bool CameraDriver::setupCameraStreamStructs()
             stream.camera_info_url = camera_info_urls[i];
 
             //--- add 'file://' to beginning of camera_info_url
-            if (stream.camera_info_url.find_first_of("file://") != 0)
+            if (stream.camera_info_url.find("file://") != 0)
                 stream.camera_info_url = "file://" + stream.camera_info_url;
         }
 
@@ -445,7 +445,7 @@ bool CameraDriver::setupCameraStreamStructs()
         //--- get bits per pixel
         sensor.n_bits_pixel =
           ARV_PIXEL_FORMAT_BIT_PER_PIXEL(arv_camera_get_pixel_format(p_camera_, err.ref()));
-        ASSERT_GERROR_MSG(err, logger_, "In getting 'Bits per Pixel'.", is_successful);
+        CHECK_SUCCESS_GERROR_MSG(err, logger_, "In getting 'Bits per Pixel'.", is_successful);
 
         //--- get sensor size
         RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.SensorWidth' and "
@@ -1064,7 +1064,7 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
         //--- no subscriber so far, start acquisition
         if (iEventInfo.current_count > 0 && current_num_subscribers_ == 0)
         {
-            RCLCPP_DEBUG(logger_, "-> Acquisition started.");
+            RCLCPP_INFO(logger_, "|-> Acquisition start.");
 
             arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
             CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
@@ -1073,7 +1073,7 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
         //--- subscribers until now, stop acquisition
         else if (iEventInfo.current_count == 0 && current_num_subscribers_ > 0)
         {
-            RCLCPP_DEBUG(logger_, "-> Acquisition stopped.");
+            RCLCPP_INFO(logger_, "->| Acquisition stop.");
 
             arv_device_execute_command(p_device_, "AcquisitionStop", err.ref());
             CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStop'.");
@@ -1081,10 +1081,13 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
     }
     else
     {
-        RCLCPP_DEBUG(logger_, "p_device_ is NULL or node is not initialized.");
+        RCLCPP_WARN(logger_, "Subscription change detected but no action taken. "
+                             "Reason: p_device_ is NULL or node is not initialized.");
+        return;
     }
 
     //--- get the maximum number of subscribers over all streams and assign to the member variable
+    current_num_subscribers_ = 0;
     for (uint i = 0; i < streams_.size(); ++i)
     {
         current_num_subscribers_ =
@@ -1191,11 +1194,9 @@ void CameraDriver::setupDynamicParameters()
                                 fpRange.to_value = std::min(fpRange.to_value,
                                                             feature_dict["Max"].as<double>());
 
-                            fpRange.step =
-                              arv_device_get_float_feature_increment(
-                                p_device_, feature_name.c_str(), err.ref());
+                            fpRange.step = 0;
 
-                            if (fpRange.from_value != INT_MIN && fpRange.to_value != INT_MAX)
+                            if (fpRange.from_value != DBL_MIN && fpRange.to_value != DBL_MAX)
                                 param_desc.floating_point_range = {fpRange};
 
                             //--- get current value as default and restrict it to 3 chars after
@@ -1234,9 +1235,10 @@ void CameraDriver::setupDynamicParameters()
                                   static_cast<int>(intRange.to_value),
                                   feature_dict["Max"].as<int>());
 
-                            intRange.step =
-                              arv_device_get_float_feature_increment(
-                                p_device_, feature_name.c_str(), err.ref());
+                            intRange.step = 0;
+
+                            if (intRange.from_value != INT_MIN && intRange.to_value != INT_MAX)
+                                param_desc.integer_range = {intRange};
 
                             //--- get current value as default
                             int defVal = 0;
@@ -1470,7 +1472,7 @@ void CameraDriver::publishCameraDiagnosticsLoop(double rate) const
         GuardedGError err;
         bool is_feature_available =
           arv_device_is_feature_available(p_device_, name.c_str(), err.ref());
-        ASSERT_GERROR(err, logger_, is_successful)
+        CHECK_SUCCESS_GERROR(err, logger_, is_successful)
 
         return (is_feature_available && is_successful);
     };
@@ -1664,7 +1666,7 @@ void CameraDriver::spawnCameraStreams()
     {
         RCLCPP_FATAL(logger_, "Failed to open streams for camera %s.",
                      guid_.c_str());
-        ASSERT_SUCCESS(false);
+        return;
     }
 
     //--- Connect signals with callbacks and activate emission of signals
@@ -1686,6 +1688,15 @@ void CameraDriver::spawnCameraStreams()
         arv_stream_set_emit_signals(STREAM.p_arv_stream, TRUE);
     }
 
+    //--- print final output message
+    std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
+    RCLCPP_INFO(logger_, "Done initializing.");
+    RCLCPP_INFO(logger_, "  Camera:        %s", camera_guid_str.c_str());
+    if (arv_camera_is_gv_device(p_camera_) && CameraAravisNodeBase::isIpAddress(guid_))
+        RCLCPP_INFO(logger_, "  IP:            %s", guid_.c_str());
+    RCLCPP_INFO(logger_, "  Num. Streams:  (%i / %i)",
+                num_opened_streams, static_cast<int>(streams_.size()));
+
 #ifndef WITH_MATCHED_EVENTS
     //--- If matched events are not available, the number of subscribers are not dynamically
     //--- changed. Thus, set number of subscribers to 1 in order for the acquisition to be started
@@ -1696,18 +1707,11 @@ void CameraDriver::spawnCameraStreams()
     //--- When there are already subscribers to the image topic, start acquisition.
     if (current_num_subscribers_ > 0)
     {
-        RCLCPP_DEBUG(logger_, "'AcquisitionStart' at initialization.");
+        RCLCPP_INFO(logger_, "|-> Acquisition start at initialization.");
 
         arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
         CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
     }
-
-    //--- print final output message
-    std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
-    RCLCPP_INFO(logger_, "Done initializing.");
-    RCLCPP_INFO(logger_, "  Camera:        %s", camera_guid_str.c_str());
-    RCLCPP_INFO(logger_, "  Num. Streams:  (%i / %i)",
-                num_opened_streams, static_cast<int>(streams_.size()));
 
     this->is_initialized_ = true;
 }
@@ -1874,10 +1878,12 @@ void CameraDriver::printCameraConfiguration() const
     rclcpp::ParameterValue tmp_param_value;
     std::vector<std::pair<std::string, rclcpp::ParameterValue>> tmp_param_values;
 
+    std::string camera_guid_str = CameraAravisNodeBase::constructCameraGuidStr(p_camera_);
+
     RCLCPP_INFO(logger_, "======================================");
     RCLCPP_INFO(logger_, "Camera Configuration:");
     RCLCPP_INFO(logger_, "--------------------------------------");
-    RCLCPP_INFO(logger_, "  GUID:                  %s", guid_.c_str());
+    RCLCPP_INFO(logger_, "  GUID:                  %s", camera_guid_str.c_str());
     if (is_verbose_enable_)
     {
         RCLCPP_INFO(logger_, "  Type:                  %s",
@@ -2076,7 +2082,7 @@ void CameraDriver::printCameraConfiguration() const
 
     for (std::string warn_msg : config_warn_msgs_)
     {
-        RCLCPP_WARN(logger_, warn_msg.c_str());
+        RCLCPP_WARN(logger_, "%s", warn_msg.c_str());
     }
 }
 

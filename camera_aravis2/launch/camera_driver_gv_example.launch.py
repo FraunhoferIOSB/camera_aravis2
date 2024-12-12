@@ -55,7 +55,7 @@ def generate_launch_description():
                     'guid': 'Allied Vision-Alvium G1-240c-05P3C',
                     'frame_id': 'camera_gv',
                     'stream_names': ['vis'],
-                    'camera_info_urls': ['file://' + os.path.join(
+                    'camera_info_urls': [os.path.join(
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_info_example_gv.yaml')],
                     'dynamic_parameters_yaml_url': os.path.join(

@@ -10,6 +10,8 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
 
 **Acknowledgement**: This software was developed as part of the project [ROBDEKON – Robotic Systems for Decontamination in Hazardous Environments](https://robdekon.de/), funded by the Federal Ministry of Education and Research (BMBF) under the German Federal Government’s Research for Civil Security program.
 
+*camera_aravis for ROS 1 can be found here: https://github.com/FraunhoferIOSB/camera_aravis*
+
 ------------------------
 
 ### Continuous Integration:
@@ -37,7 +39,9 @@ It currently implements the gigabit ethernet and USB3 protocols used by industri
     - [How to manually trigger calculation of white balance ratios](#how-to-manually-trigger-calculation-of-white-balance-ratios)
     - [How to dynamically change camera parameters](#how-to-dynamically-change-camera-parameters)
     - [How to publish camera diagnostics / status](#how-to-publish-camera-diagnostics--status)
+    - [How to access GigEVision camera using the IP address](#how-to-access-gigevision-camera-using-the-ip-address)
 - [Known Issues](#known-issues)
+- [Contributing](CONTRIBUTING.md)
 
 ------------------------
 
@@ -53,7 +57,7 @@ The configuration of the camera driver is divided into a driver-specific and Gen
 
 #### Driver-specific Parameters
 
-- `guid`: Serial number of the camera that is to be opened. GUIDs of available cameras can be discovered with [`camera_finder`](#finding-available-cameras) node.
+- `guid`: Serial number or IP address *(GigEVision Cameras only)* of the camera that is to be opened. GUIDs and IP addresses of available cameras can be discovered with [`camera_finder`](#finding-available-cameras) node.
     - Type: String
     - Default: ""
     - Optional. If omitted a random camera is picked from the list of connected cameras and will be opened.
@@ -402,6 +406,11 @@ additionally specify a list of ```Selectors```. Each entry in this list should a
 
 For each feature a key-value pair is constructed and published in the ```data``` field of the 
 message stated above. If a feature as a list of selectors, one key-value pair is constructed for each Feature-Selector pair.
+
+### How to access GigEVision camera using the IP address
+
+GigEVision cameras can also be accessed using their IP address instead of their serial number simply by passing the address to the launch parameter [`guid`](#driver-specific-parameters). 
+GUIDs and IP addresses of available cameras can be discovered with [`camera_finder`](#finding-available-cameras) node. 
 
 ## Known Issues
 

@@ -38,39 +38,27 @@
 // ROS
 #include <rclcpp/rclcpp.hpp>
 
-/// Macro to assert success and log GError if necessary
-#define ASSERT_GERROR(err, logger, success) \
-    if (err)                                \
-    {                                       \
-        success &= false;                   \
-        err.log(logger);                    \
-    }                                       \
-    else                                    \
-    {                                       \
-        success &= true;                    \
-    }
-
-/// Macro to assert success and log GError if necessary with custommesage
-#define ASSERT_GERROR_MSG(err, logger, custom_msg, success) \
-    if (err)                                                \
-    {                                                       \
-        success &= false;                                   \
-        err.log(logger, custom_msg);                        \
-    }                                                       \
-    else                                                    \
-    {                                                       \
-        success &= true;                                    \
-    }
-
 /// Macro to check if error occurred and log if necessary
 #define CHECK_GERROR(err, logger) \
     if (err)                      \
-        err.log(logger);
+        err.log(logger, __FILE__, __LINE__);
 
 /// Macro to check if error occurred and log if necessary with costom message
 #define CHECK_GERROR_MSG(err, logger, custom_msg) \
     if (err)                                      \
-        err.log(logger, custom_msg);
+        err.log(logger, __FILE__, __LINE__, custom_msg);
+
+/// Macro to assert success and log GError if necessary
+#define CHECK_SUCCESS_GERROR(err, logger, success) \
+    if (err)                                       \
+        err.log(logger, __FILE__, __LINE__);       \
+    success &= !err;
+
+/// Macro to assert success and log GError if necessary with custom mesage
+#define CHECK_SUCCESS_GERROR_MSG(err, logger, custom_msg, success) \
+    if (err)                                                       \
+        err.log(logger, __FILE__, __LINE__, custom_msg);           \
+    success &= !err;
 
 namespace camera_aravis2
 {
@@ -92,6 +80,8 @@ class GuardedGError
     operator bool() const;
 
     void log(const rclcpp::Logger& logger,
+             const std::string& file,
+             const int& line,
              const std::string& custom_msg = "") const;
 
     //--- MEMBER DECLARATION ---//

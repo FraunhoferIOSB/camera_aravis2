@@ -29,6 +29,8 @@
 #include "camera_aravis2/camera_aravis_node_base.h"
 
 // Std
+#include <regex>
+#include <string>
 #include <type_traits>
 
 // camera_aravis2
@@ -57,6 +59,7 @@ CameraAravisNodeBase::~CameraAravisNodeBase()
     if (p_camera_)
         g_object_unref(p_camera_);
 
+    arv_shutdown();
     RCLCPP_INFO(logger_, "Node has shut down.");
 }
 
@@ -67,7 +70,7 @@ bool CameraAravisNodeBase::isInitialized() const
 }
 
 //==================================================================================================
-[[nodiscard]] bool CameraAravisNodeBase::listAvailableCameraDevices() const
+uint CameraAravisNodeBase::listAvailableCameraDevices() const
 {
     //--- Discover available interfaces and devices.
 
@@ -75,20 +78,23 @@ bool CameraAravisNodeBase::isInitialized() const
     auto n_interfaces = arv_get_n_interfaces();
     auto n_devices    = arv_get_n_devices();
 
-    if (n_devices == 0)
+    if (n_devices > 0)
+    {
+        RCLCPP_INFO(logger_, "Attached cameras (Num. Interfaces: %d | Num. Devices: %d):",
+                    n_interfaces, n_devices);
+        for (uint i = 0; i < n_devices; i++)
+        {
+            RCLCPP_INFO(logger_, "  Device %d: %s (%s)", i,
+                        arv_get_device_id(i),
+                        arv_get_device_address(i));
+        }
+    }
+    else
     {
         RCLCPP_FATAL(logger_, "No cameras detected.");
-        return false;
     }
 
-    RCLCPP_INFO(logger_, "Attached cameras (Num. Interfaces: %d | Num. Devices: %d):",
-                n_interfaces, n_devices);
-    for (uint i = 0; i < n_devices; i++)
-        RCLCPP_INFO(logger_, "  Device %d: %s (%s)", i,
-                    arv_get_device_id(i),
-                    arv_get_device_address(i));
-
-    return true;
+    return n_devices;
 }
 
 //==================================================================================================
@@ -110,8 +116,8 @@ void CameraAravisNodeBase::setupParameters()
 
     //--- Discover available interfaces and devices.
 
-    bool is_successful = listAvailableCameraDevices();
-    if (!is_successful)
+    uint n_devices = listAvailableCameraDevices();
+    if (n_devices == 0)
         return false;
 
     //--- connect to camera specified by guid parameter
@@ -257,8 +263,8 @@ bool CameraAravisNodeBase::getFeatureValue(const std::string& feature_name, T& v
                     typeid(T).name());
     }
 
-    ASSERT_GERROR_MSG(err, logger_,
-                      "In getting value for feature '" + feature_name + "'.", is_successful);
+    CHECK_SUCCESS_GERROR_MSG(err, logger_,
+                             "In getting value for feature '" + feature_name + "'.", is_successful);
 
     return is_successful;
 }
@@ -287,7 +293,7 @@ bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, cons
     {
         RCLCPP_WARN(logger_, "Feature '%s' is not available. Value will not be set.",
                     feature_name.c_str());
-        ASSERT_GERROR(err, logger_, is_successful);
+        CHECK_SUCCESS_GERROR(err, logger_, is_successful);
         return false;
     }
 
@@ -325,8 +331,8 @@ bool CameraAravisNodeBase::setFeatureValue(const std::string& feature_name, cons
                     typeid(T).name());
     }
 
-    ASSERT_GERROR_MSG(err, logger_,
-                      "In setting value for feature '" + feature_name + "'.", is_successful);
+    CHECK_SUCCESS_GERROR_MSG(err, logger_,
+                             "In setting value for feature '" + feature_name + "'.", is_successful);
 
     return is_successful;
 }
@@ -378,7 +384,7 @@ bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string& feature_nam
     {
         RCLCPP_WARN(logger_, "Feature '%s' is not available. Value will not be set.",
                     feature_name.c_str());
-        ASSERT_GERROR(err, logger_, is_successful);
+        CHECK_SUCCESS_GERROR(err, logger_, is_successful);
         return false;
     }
 
@@ -397,8 +403,11 @@ bool CameraAravisNodeBase::setBoundedFeatureValue(const std::string& feature_nam
                     typeid(T).name());
     }
 
-    ASSERT_GERROR_MSG(err, logger_,
-                      "In setting value for feature '" + feature_name + "'.", is_successful);
+    CHECK_SUCCESS_GERROR_MSG(err, logger_,
+                             "In setting value for feature '" + feature_name + "'.", is_successful);
+
+    if (!is_successful)
+        return false;
 
     T boundedValue = std::max(*min, std::min(value, *max));
 
@@ -627,7 +636,10 @@ bool CameraAravisNodeBase::isParameterValueEqualTo(const rclcpp::ParameterValue&
         return false;
     }
 
-    return (value == test_value);
+    if constexpr (std::is_same_v<T, double>)
+        return (std::abs(value - test_value) < 0.0001);
+    else
+        return (value == test_value);
 }
 template bool CameraAravisNodeBase::isParameterValueEqualTo<bool>(
   const rclcpp::ParameterValue&, const bool&, const uint&) const;
@@ -655,16 +667,31 @@ bool CameraAravisNodeBase::executeCommand(const std::string& feature_name) const
     {
         RCLCPP_WARN(logger_, "Command '%s' is not available. Value will not be executed.",
                     feature_name.c_str());
-        ASSERT_GERROR(err, logger_, is_successful);
+        CHECK_SUCCESS_GERROR(err, logger_, is_successful);
         return false;
     }
 
     arv_device_execute_command(p_device_, feature_name.c_str(), err.ref());
 
-    ASSERT_GERROR_MSG(err, logger_,
-                      "In executing command '" + feature_name + "'.", is_successful);
+    CHECK_SUCCESS_GERROR_MSG(err, logger_,
+                             "In executing command '" + feature_name + "'.", is_successful);
 
     return is_successful;
+}
+
+//==================================================================================================
+bool CameraAravisNodeBase::isIpAddress(const std::string& str)
+{
+    //--- Regular expression for an IPv4 address
+    //--- 25[0-5] allows values between 250-255
+    //--- 2[0-4][0-9] allows values between 200-249
+    //--- [01]?[0-9][0-9] allows values between 0-199
+    //--- this is repeated three times with a succeeding .
+    //--- (\b ... \b) ensures that the whole expression is considered
+    std::regex ipv4Regex(
+      R"((\b(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b)");
+
+    return std::regex_match(str, ipv4Regex);
 }
 
 //==================================================================================================

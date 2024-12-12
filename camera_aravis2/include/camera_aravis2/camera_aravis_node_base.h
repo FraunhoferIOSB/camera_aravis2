@@ -30,6 +30,7 @@
 #define CAMERA_ARAVIS2__CAMERA_ARAVIS_NODE_BASE_H_
 
 // Std
+#include <cassert>
 #include <map>
 #include <string>
 #include <utility>
@@ -48,17 +49,12 @@ extern "C"
 #include "camera_aravis2/error.h"
 
 // Macro to assert success of given function
-#define ASSERT_SUCCESS(fn) \
-    if (!fn)               \
-    {                      \
-        return;            \
-    }
-// Macro to assert success of given function and shut down if not successful
-#define ASSERT_SUCCESS_AND_SHUTDOWN(fn) \
-    if (!fn)                            \
-    {                                   \
-        rclcpp::shutdown();             \
-        return;                         \
+#define CHECK_SUCCESS(expr, logger)                                         \
+    if (!expr)                                                              \
+    {                                                                       \
+        RCLCPP_FATAL(logger, "%s:%i: Assertion on success of '%s' failed.", \
+                     __FILE__, __LINE__, #expr);                            \
+        return;                                                             \
     }
 
 namespace camera_aravis2
@@ -92,8 +88,9 @@ class CameraAravisNodeBase : public rclcpp::Node
     /**
      * @brief List available camera devices.
      *
+     * @return Number of available devices.
      */
-    [[nodiscard]] bool listAvailableCameraDevices() const;
+    uint listAvailableCameraDevices() const;
 
   protected:
     /**
@@ -298,6 +295,11 @@ class CameraAravisNodeBase : public rclcpp::Node
     //--- FUNCTION DECLARATION ---//
 
   protected:
+    /**
+     * @brief Check if given string is an IP Adress.
+     */
+    static bool isIpAddress(const std::string& str);
+
     /**
      * @brief Construct GUID string of given camera, using vendor name, model name and
      * device serial number.
