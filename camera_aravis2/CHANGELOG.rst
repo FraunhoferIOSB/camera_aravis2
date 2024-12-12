@@ -2,8 +2,8 @@
 Changelog for package camera_aravis2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.1.0 (2024-12-12)
+------------------
 * Update maintainer -> Raphael Hagmanns
 * Enhance: Improved assertions and error messages
 * Fix: added failure exit code to nodes
