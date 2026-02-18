@@ -194,7 +194,7 @@ bool CameraDriver::setupCameraStreamStructs()
     if (base_frame_id.empty())
     {
         base_frame_id = this->get_fully_qualified_name();
-        base_frame_id.replace(0, 1, ""); // remove first '/'
+        base_frame_id.replace(0, 1, "");  // remove first '/'
         std::replace(base_frame_id.begin(), base_frame_id.end(), '/', '_');
     }
 
@@ -274,7 +274,8 @@ bool CameraDriver::setupCameraStreamStructs()
 }
 
 //==================================================================================================
-void CameraDriver::filterParameterListNames(std::vector<std::pair<std::string, rclcpp::ParameterValue>>& parameter_list)
+void CameraDriver::filterParameterListNames(
+  std::vector<std::pair<std::string, rclcpp::ParameterValue>>& parameter_list)
 {
     int number;
     char new_name[100];
@@ -636,7 +637,6 @@ void CameraDriver::filterParameterListNames(std::vector<std::pair<std::string, r
             filterParameterListNames(tmp_param_values);
             setFeatureValuesFromParameterList(tmp_param_values, i);
         }
-
 
         // NOTE: Not all parameters are essential, which is why only the success of some parameters
         // are checked.
@@ -2247,4 +2247,4 @@ void CameraDriver::handleNewBufferSignal(ArvStream* p_stream, gpointer p_user_da
     stream.buffer_queue.push(std::make_pair(p_arv_buffer, p_img_msg));
 }
 
-} // end namespace camera_aravis2
+}  // end namespace camera_aravis2
