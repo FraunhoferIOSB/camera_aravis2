@@ -180,6 +180,17 @@ class CameraDriver : public CameraAravisNodeBase
      */
     [[nodiscard]] bool setupCameraStreamStructs();
 
+    /** @brief Filter the names of the params to remove the prefix "#NN_" used to
+    * assign a specific order of the parameters overrides.
+    *  @param[in] parameter_list List of parameters to filter
+    *
+    * Example:
+    *   #1_ImportantParameter --> ImportantParameter
+    *   AnotherImportantParameters --> AnotherImportantParameters
+    *   #_ParamName --> #_ParamName
+    */
+    void filterParameterListNames(std::vector<std::pair<std::string, rclcpp::ParameterValue>>& parameter_list);
+
     /**
      * @brief Get list of parameters underneath 'param_name' within the list of device
      * control parameters.

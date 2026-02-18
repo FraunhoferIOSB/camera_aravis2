@@ -274,6 +274,20 @@ bool CameraDriver::setupCameraStreamStructs()
 }
 
 //==================================================================================================
+void CameraDriver::filterParameterListNames(std::vector<std::pair<std::string, rclcpp::ParameterValue>>& parameter_list)
+    {
+        int number;
+        char new_name[100];
+        for (auto& param : parameter_list)
+        {
+            if (sscanf(param.first.c_str(), "#%d_%s", &number, new_name) < 2)
+                continue;
+
+            param.first = std::string(new_name);
+        }
+    }
+
+//==================================================================================================
 [[nodiscard]] bool CameraDriver::getDeviceControlParameterList(
   const std::string& param_name,
   std::vector<std::pair<std::string, rclcpp::ParameterValue>>& param_values) const
