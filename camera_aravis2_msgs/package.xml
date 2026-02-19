@@ -5,6 +5,7 @@
   <version>1.1.0</version>
   <description>Messages and service definitions for the camera_aravis2 package.</description>
   <maintainer email="raphael.hagmanns@iosb.fraunhofer.de">Raphael Hagmanns</maintainer>
+  <maintainer email="miguel.granero@iosb.fraunhofer.de">Miguel Granero</maintainer>
   <license>BSD</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
