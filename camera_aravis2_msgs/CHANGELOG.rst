@@ -2,6 +2,11 @@
 Changelog for package camera_aravis2_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* other: add miguel as maintainer
+* Contributors: Miguel Granero
+
 1.1.0 (2024-12-12)
 ------------------
 * Update maintainer -> Raphael Hagmanns

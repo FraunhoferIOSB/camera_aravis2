@@ -2,6 +2,16 @@
 Changelog for package camera_aravis2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* other: add miguel as maintainer
+* feat: enable manual param order in BEGIN and END
+  Use the prefix #NN\_ to preserve the order. For example:
+  `#1 <https://github.com/FraunhoferIOSB/camera_aravis2/issues/1>`__FirstParam
+  `#2 <https://github.com/FraunhoferIOSB/camera_aravis2/issues/2>`__SecondParam
+  OtherParamsThatAreAlphabeticallyOrdered
+* Contributors: Miguel Granero
+
 1.1.0 (2024-12-12)
 ------------------
 * Update maintainer -> Raphael Hagmanns
