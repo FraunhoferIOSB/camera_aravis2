@@ -2,8 +2,8 @@
 Changelog for package camera_aravis2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.2.0 (2026-03-09)
+------------------
 * other: add miguel as maintainer
 * feat: enable manual param order in BEGIN and END
   Use the prefix #NN\_ to preserve the order. For example:
