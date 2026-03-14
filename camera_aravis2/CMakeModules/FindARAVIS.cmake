@@ -16,6 +16,12 @@
 
 set(ARAVIS_VERSION 0.8)
 
+find_package(PkgConfig)
+if(PKG_CONFIG_FOUND)
+  pkg_check_modules(ARAVIS aravis-${ARAVIS_VERSION})
+endif()
+
+if(NOT ARAVIS_FOUND)
 find_path(ARAVIS_INCLUDE_DIRS arv.h
   PATHS
   "$ENV{ARAVIS_INCLUDE_PATH}"
@@ -36,3 +42,4 @@ find_package_handle_standard_args( ARAVIS DEFAULT_MSG
   ARAVIS_INCLUDE_DIRS
   ARAVIS_LIBRARIES
 )
+endif() # if(NOT ARAVIS_FOUND)
