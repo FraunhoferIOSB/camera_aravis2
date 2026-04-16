@@ -4,7 +4,7 @@ An actively maintained ROS 2 camera driver for [GenICam](https://www.emva.org/st
 It is a subsequent development of [camera_aravis](https://github.com/FraunhoferIOSB/camera_aravis), but in order to clean up some legacy code and, in turn, support new features mor easily, we opted to implement it with a new code-base. 
 It is open sourced under the 3-clause BSD license.
 
-It relies on the [Aravis](http://live.gnome.org/Aravis) library to access the GigEVision and USB3Vision cameras. 
+It relies on the [Aravis](https://github.com/aravisproject/aravis) library to access the GigEVision and USB3Vision cameras. 
 Aravis is a glib/gobject based library for video acquisition using GenICam cameras. 
 It currently implements the gigabit ethernet and USB3 protocols used by industrial cameras.
 
