@@ -449,7 +449,32 @@ void CameraDriver::filterParameterListNames(
         is_parameter_set = getImageFormatControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
-        getFeatureValue<std::string>(tmp_feature_name, sensor.pixel_format);
+        if (!getFeatureValue<std::string>(tmp_feature_name, sensor.pixel_format) ||
+            sensor.pixel_format.empty())
+        {
+            guint32 pf_reg      = 0;
+            GError* reg_err_raw = nullptr;
+            arv_device_read_register(p_device_, 0x12540, &pf_reg, &reg_err_raw);
+            if (!reg_err_raw)
+            {
+                static const std::map<guint64, std::string> PF_MAP = {
+                  {0x01080001, "Mono8"},
+                  {0x01080009, "BayerRG8"},
+                  {0x01080008, "BayerGR8"},
+                  {0x0108000A, "BayerGB8"},
+                  {0x0108000B, "BayerBG8"},
+                };
+                auto pf_itr = PF_MAP.find(static_cast<guint64>(pf_reg));
+                if (pf_itr != PF_MAP.end())
+                {
+                    sensor.pixel_format = pf_itr->second;
+                    RCLCPP_WARN(logger_, "PixelFormat fallback: %s (0x%08X)",
+                                sensor.pixel_format.c_str(), pf_reg);
+                }
+            }
+            if (reg_err_raw)
+                g_error_free(reg_err_raw);
+        }
         if (is_parameter_set &&
             !isParameterValueEqualTo<std::string>(tmp_param_value, sensor.pixel_format, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
@@ -467,16 +492,74 @@ void CameraDriver::filterParameterListNames(
                                         "Likely you need to implement one.");
 
         //--- get bits per pixel
-        sensor.n_bits_pixel =
-          ARV_PIXEL_FORMAT_BIT_PER_PIXEL(arv_camera_get_pixel_format(p_camera_, err.ref()));
-        CHECK_SUCCESS_GERROR_MSG(err, logger_, "In getting 'Bits per Pixel'.", is_successful);
+        {
+            GuardedGError pf_err;
+            ArvPixelFormat pf_val = arv_camera_get_pixel_format(p_camera_, pf_err.ref());
+            if (!pf_err)
+            {
+                sensor.n_bits_pixel = ARV_PIXEL_FORMAT_BIT_PER_PIXEL(pf_val);
+            }
+            else
+            {
+                guint32 pf_reg2      = 0;
+                GError* reg_err2_raw = nullptr;
+                arv_device_read_register(p_device_, 0x12540, &pf_reg2, &reg_err2_raw);
+                if (!reg_err2_raw)
+                    sensor.n_bits_pixel = ARV_PIXEL_FORMAT_BIT_PER_PIXEL(
+                      static_cast<ArvPixelFormat>(pf_reg2));
+                else
+                {
+                    RCLCPP_WARN(logger_, "BitsPerPixel failed, defaulting to 8.");
+                    sensor.n_bits_pixel = 8;
+                }
+                if (reg_err2_raw)
+                    g_error_free(reg_err2_raw);
+                RCLCPP_WARN(logger_, "BitsPerPixel fallback: %zu", sensor.n_bits_pixel);
+            }
+        }
 
         //--- get sensor size
         RCLCPP_DEBUG(logger_, "Evaluating 'ImageFormatControl.SensorWidth' and "
                               "'ImageFormatControl.SensorHeight' for stream %i.",
                      i);
-        getFeatureValue<int>("SensorWidth", sensor.width);
-        getFeatureValue<int>("SensorHeight", sensor.height);
+        if (!getFeatureValue<int>("SensorWidth", sensor.width) || sensor.width <= 0 || sensor.width > 100000)
+        {
+            guint32 sw_reg     = 0;
+            GError* sw_err_raw = nullptr;
+            arv_device_read_register(p_device_, 0x12500, &sw_reg, &sw_err_raw);
+            if (!sw_err_raw && sw_reg > 0 && sw_reg <= 100000)
+            {
+                sensor.width = static_cast<int>(sw_reg);
+                RCLCPP_WARN(logger_, "SensorWidth fallback: %i (reg 0x12500=0x%08X)",
+                            sensor.width, sw_reg);
+            }
+            else
+            {
+                sensor.width = 2448;
+                RCLCPP_WARN(logger_, "SensorWidth fallback: hardcoded %i", sensor.width);
+            }
+            if (sw_err_raw)
+                g_error_free(sw_err_raw);
+        }
+        if (!getFeatureValue<int>("SensorHeight", sensor.height) || sensor.height <= 0 || sensor.height > 100000)
+        {
+            guint32 sh_reg     = 0;
+            GError* sh_err_raw = nullptr;
+            arv_device_read_register(p_device_, 0x12510, &sh_reg, &sh_err_raw);
+            if (!sh_err_raw && sh_reg > 0 && sh_reg <= 100000)
+            {
+                sensor.height = static_cast<int>(sh_reg);
+                RCLCPP_WARN(logger_, "SensorHeight fallback: %i (reg 0x12510=0x%08X)",
+                            sensor.height, sh_reg);
+            }
+            else
+            {
+                sensor.height = 2048;
+                RCLCPP_WARN(logger_, "SensorHeight fallback: hardcoded %i", sensor.height);
+            }
+            if (sh_err_raw)
+                g_error_free(sh_err_raw);
+        }
 
         //--- horizontal and vertical flip
         tmp_feature_name = "ReverseX";
@@ -571,6 +654,25 @@ void CameraDriver::filterParameterListNames(
             setFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_param_value, tmp_min_int, tmp_max_int, i);
         getFeatureValue<int>(tmp_feature_name, image_roi.width);
+        if (image_roi.width <= 0 || image_roi.width > 100000)
+        {
+            guint32 roi_w_reg = 0;
+            GError* roi_w_err = nullptr;
+            arv_device_read_register(p_device_, 0x12500, &roi_w_reg, &roi_w_err);
+            if (!roi_w_err && roi_w_reg > 0 && roi_w_reg <= 100000)
+            {
+                image_roi.width = static_cast<int>(roi_w_reg);
+                RCLCPP_WARN(logger_, "ROI Width fallback: %i (reg 0x12500=0x%08X)",
+                            image_roi.width, roi_w_reg);
+            }
+            else
+            {
+                image_roi.width = sensor.width;
+                RCLCPP_WARN(logger_, "ROI Width fallback: hardcoded %i", image_roi.width);
+            }
+            if (roi_w_err)
+                g_error_free(roi_w_err);
+        }
         if (is_parameter_set &&
             !isParameterValueEqualTo<int64_t>(tmp_param_value, image_roi.width, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
@@ -595,6 +697,25 @@ void CameraDriver::filterParameterListNames(
             setFeatureValueFromParameter<int64_t>(
               tmp_feature_name, tmp_param_value, tmp_min_int, tmp_max_int, i);
         getFeatureValue<int>(tmp_feature_name, image_roi.height);
+        if (image_roi.height <= 0 || image_roi.height > 100000)
+        {
+            guint32 roi_h_reg = 0;
+            GError* roi_h_err = nullptr;
+            arv_device_read_register(p_device_, 0x12510, &roi_h_reg, &roi_h_err);
+            if (!roi_h_err && roi_h_reg > 0 && roi_h_reg <= 100000)
+            {
+                image_roi.height = static_cast<int>(roi_h_reg);
+                RCLCPP_WARN(logger_, "ROI Height fallback: %i (reg 0x12510=0x%08X)",
+                            image_roi.height, roi_h_reg);
+            }
+            else
+            {
+                image_roi.height = sensor.height;
+                RCLCPP_WARN(logger_, "ROI Height fallback: hardcoded %i", image_roi.height);
+            }
+            if (roi_h_err)
+                g_error_free(roi_h_err);
+        }
         if (is_parameter_set &&
             !isParameterValueEqualTo<int64_t>(tmp_param_value, image_roi.height, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
@@ -608,6 +729,25 @@ void CameraDriver::filterParameterListNames(
         if (is_parameter_set)
             setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
         getFeatureValue<int>(tmp_feature_name, image_roi.x);
+        if (image_roi.x < 0 || image_roi.x > 100000)
+        {
+            guint32 roi_x_reg = 0;
+            GError* roi_x_err = nullptr;
+            arv_device_read_register(p_device_, 0x12520, &roi_x_reg, &roi_x_err);
+            if (!roi_x_err && static_cast<int>(roi_x_reg) >= 0 && roi_x_reg <= 100000)
+            {
+                image_roi.x = static_cast<int>(roi_x_reg);
+                RCLCPP_WARN(logger_, "ROI OffsetX fallback: %i (reg 0x12520=0x%08X)",
+                            image_roi.x, roi_x_reg);
+            }
+            else
+            {
+                image_roi.x = 0;
+                RCLCPP_WARN(logger_, "ROI OffsetX fallback: hardcoded 0");
+            }
+            if (roi_x_err)
+                g_error_free(roi_x_err);
+        }
         if (is_parameter_set &&
             !isParameterValueEqualTo<int64_t>(tmp_param_value, image_roi.x, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
@@ -621,6 +761,25 @@ void CameraDriver::filterParameterListNames(
         if (is_parameter_set)
             setFeatureValueFromParameter<int64_t>(tmp_feature_name, tmp_param_value, i);
         getFeatureValue<int>(tmp_feature_name, image_roi.y);
+        if (image_roi.y < 0 || image_roi.y > 100000)
+        {
+            guint32 roi_y_reg = 0;
+            GError* roi_y_err = nullptr;
+            arv_device_read_register(p_device_, 0x12530, &roi_y_reg, &roi_y_err);
+            if (!roi_y_err && static_cast<int>(roi_y_reg) >= 0 && roi_y_reg <= 100000)
+            {
+                image_roi.y = static_cast<int>(roi_y_reg);
+                RCLCPP_WARN(logger_, "ROI OffsetY fallback: %i (reg 0x12530=0x%08X)",
+                            image_roi.y, roi_y_reg);
+            }
+            else
+            {
+                image_roi.y = 0;
+                RCLCPP_WARN(logger_, "ROI OffsetY fallback: hardcoded 0");
+            }
+            if (roi_y_err)
+                g_error_free(roi_y_err);
+        }
         if (is_parameter_set &&
             !isParameterValueEqualTo<int64_t>(tmp_param_value, image_roi.y, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
@@ -720,11 +879,76 @@ void CameraDriver::filterParameterListNames(
         is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
-        getFeatureValue<std::string>(tmp_feature_name, acq_ctrl.acquisition_mode);
+        if (!getFeatureValue<std::string>(tmp_feature_name, acq_ctrl.acquisition_mode) ||
+            acq_ctrl.acquisition_mode.empty() ||
+            acq_ctrl.acquisition_mode == "SingleFrame")
+        {
+            acq_ctrl.acquisition_mode = "Continuous";
+            RCLCPP_WARN(logger_, "AcquisitionMode fallback: Continuous.");
+        }
         if (is_parameter_set &&
             !isParameterValueEqualTo<std::string>(tmp_param_value, acq_ctrl.acquisition_mode, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
                                         "'" + tmp_feature_name + "' is not as specified.");
+
+        //--- TriggerMode: force free-run mode (release external trigger wait state)
+        //    Huaray cameras default to TriggerMode=On(FrameStart/FallingEdge).
+        //    GenICam access fails due to BigEndian bug; use raw register writes instead.
+        //    Register map (from camera XML):
+        //      0x50000100: TriggerSelectorVal (0=AcquisitionStart, 1=FrameStart)
+        //      0x4E05C178: TriggerMode for AcquisitionStart (SEL=0), Off=0, On=1
+        //      0x4E05C17C: TriggerMode for FrameStart (SEL=1), Off=0, On=1
+        {
+            GuardedGError trigger_err;
+            // First attempt via GenICam
+            arv_device_set_string_feature_value(p_device_, "TriggerMode", "Off",
+                                                trigger_err.ref());
+            if (!trigger_err)
+            {
+                RCLCPP_INFO(logger_, "TriggerMode=Off (GenICam success)");
+            }
+            else
+            {
+                RCLCPP_WARN(logger_, "TriggerMode=Off GenICam failed: %s, "
+                                     "falling back to raw register writes",
+                            trigger_err->message);
+                trigger_err.reset();
+
+                // FrameStart (SEL=1) TriggerMode=Off
+                arv_device_write_register(p_device_, 0x50000100, 1, trigger_err.ref());
+                trigger_err.reset();
+                arv_device_write_register(p_device_, 0x4E05C17C, 0, trigger_err.ref());
+                if (trigger_err)
+                    RCLCPP_WARN(logger_, "FrameStart TriggerMode=Off raw write failed: %s",
+                                trigger_err->message);
+                else
+                    RCLCPP_INFO(logger_, "FrameStart TriggerMode=Off raw write OK");
+                trigger_err.reset();
+
+                // AcquisitionStart (SEL=0) TriggerMode=Off
+                arv_device_write_register(p_device_, 0x50000100, 0, trigger_err.ref());
+                trigger_err.reset();
+                arv_device_write_register(p_device_, 0x4E05C178, 0, trigger_err.ref());
+                if (trigger_err)
+                    RCLCPP_WARN(logger_, "AcquisitionStart TriggerMode=Off raw write failed: %s",
+                                trigger_err->message);
+                else
+                    RCLCPP_INFO(logger_, "AcquisitionStart TriggerMode=Off raw write OK");
+                trigger_err.reset();
+
+                // Restore TriggerSelector to FrameStart (default)
+                arv_device_write_register(p_device_, 0x50000100, 1, trigger_err.ref());
+                trigger_err.reset();
+
+                // Verify via raw register read
+                guint32 fm_val = 0;
+                arv_device_read_register(p_device_, 0x4E05C17C, &fm_val, trigger_err.ref());
+                RCLCPP_INFO(logger_, "TriggerMode raw readback: FrameStart=0x%08X(%s) %s",
+                            fm_val, (fm_val == 0) ? "Off" : "On",
+                            trigger_err ? trigger_err->message : "OK");
+                trigger_err.reset();
+            }
+        }
 
         //--- Acquisition Frame Count
         //--- get and set only if acquisition mode is set to multi frame
@@ -751,7 +975,12 @@ void CameraDriver::filterParameterListNames(
         is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
-        getFeatureValue<std::string>(tmp_feature_name, acq_ctrl.exposure_mode);
+        if (!getFeatureValue<std::string>(tmp_feature_name, acq_ctrl.exposure_mode) ||
+            acq_ctrl.exposure_mode.empty())
+        {
+            acq_ctrl.exposure_mode = "Timed";
+            RCLCPP_WARN(logger_, "ExposureMode fallback: Timed.");
+        }
         if (is_parameter_set &&
             !isParameterValueEqualTo<std::string>(tmp_param_value, acq_ctrl.exposure_mode, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
@@ -783,6 +1012,13 @@ void CameraDriver::filterParameterListNames(
             is_parameter_set)
             setFeatureValueFromParameter<double>(tmp_feature_name, tmp_param_value, i);
         getFeatureValue<double>(tmp_feature_name, acq_ctrl.exposure_time);
+        if (acq_ctrl.exposure_time <= 0.0 || acq_ctrl.exposure_time > 1e7)
+        {
+            acq_ctrl.exposure_time = 10000.0;
+            arv_camera_set_exposure_time(p_camera_, acq_ctrl.exposure_time, nullptr);
+            RCLCPP_WARN(logger_, "ExposureTime fallback: %.1f us (force-written).",
+                        acq_ctrl.exposure_time);
+        }
         if (is_parameter_set &&
             !isParameterValueEqualTo<double>(tmp_param_value, acq_ctrl.exposure_time, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
@@ -796,11 +1032,8 @@ void CameraDriver::filterParameterListNames(
         is_parameter_set = getAcquisitionControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<bool>(tmp_feature_name, tmp_param_value, i);
-        getFeatureValue<bool>(tmp_feature_name, acq_ctrl.is_frame_rate_enable);
-        if (is_parameter_set &&
-            !isParameterValueEqualTo<bool>(tmp_param_value, acq_ctrl.is_frame_rate_enable, i))
-            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
-                                        "'" + tmp_feature_name + "' is not as specified.");
+        acq_ctrl.is_frame_rate_enable = false;  // BigEndian workaround
+        RCLCPP_WARN(logger_, "AcquisitionFrameRateEnable skipped.");
 
         tmp_feature_name = "AcquisitionFrameRate";
         RCLCPP_DEBUG(logger_, "Evaluating 'AcquisitionControl.%s' for stream %i.",
@@ -827,12 +1060,8 @@ void CameraDriver::filterParameterListNames(
                                                : "false"));
             }
         }
-        getFeatureValue<double>(tmp_feature_name, acq_ctrl.frame_rate);
-        if (is_parameter_set &&
-            acq_ctrl.is_frame_rate_enable &&
-            !isParameterValueEqualTo<double>(tmp_param_value, acq_ctrl.frame_rate, i))
-            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
-                                        "'" + tmp_feature_name + "' is not as specified.");
+        acq_ctrl.frame_rate = 24.0;  // BigEndian workaround
+        RCLCPP_WARN(logger_, "AcquisitionFrameRate skipped, defaulting to 24.0.");
 
         //--- get and set given custom features at end of acquisition control
         tmp_feature_name = "END";
@@ -975,11 +1204,8 @@ void CameraDriver::filterParameterListNames(
         is_parameter_set = getAnalogControlParameter(tmp_feature_name, tmp_param_value);
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
-        getFeatureValue<std::string>(tmp_feature_name, analog_ctrl.black_level_auto);
-        if (is_parameter_set &&
-            !isParameterValueEqualTo<std::string>(tmp_param_value, analog_ctrl.black_level_auto, i))
-            config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
-                                        "'" + tmp_feature_name + "' is not as specified.");
+        analog_ctrl.black_level_auto = "Off";  // BigEndian workaround
+        RCLCPP_WARN(logger_, "BlackLevelAuto skipped, defaulting to Off.");
 
         if (arv_auto_from_string(analog_ctrl.black_level_auto.c_str()) == ARV_AUTO_OFF)
         {
@@ -1657,16 +1883,84 @@ void CameraDriver::spawnCameraStreams()
             if (arv_camera_is_gv_device(p_camera_))
                 arv_camera_gv_select_stream_channel(p_camera_, i, err.ref());
 
+            // Read and log GevSCPS (0x0D04) and GevSCPHostPort (0x0D00) before create_stream
+            if (arv_camera_is_gv_device(p_camera_))
+            {
+                guint32 scps_pre = 0, d00_pre = 0;
+                GError* pre_err = nullptr;
+                arv_device_read_register(p_device_, 0x0D04, &scps_pre, &pre_err);
+                if (pre_err)
+                {
+                    g_error_free(pre_err);
+                }
+                arv_device_read_register(p_device_, 0x0D00, &d00_pre, nullptr);
+                RCLCPP_INFO(logger_,
+                            "GevSCPS pre-create_stream: R[0x0D04]=0x%08X "
+                            "(FiringEnable=%u PacketSize=%u) R[0x0D00]=0x%08X(HostPort=%u)",
+                            scps_pre, (scps_pre >> 31) & 1, scps_pre & 0xFFFF,
+                            d00_pre, d00_pre & 0xFFFF);
+
+                // If GevSCPHostPort is non-zero from a previous session, close the channel
+                // GigE Vision v1.x: GevSCPHostPort=0 -> channel closed -> create_stream available
+                if ((d00_pre & 0xFFFF) != 0)
+                {
+                    guint32 close_val = d00_pre & 0xFFFF0000;  // Set HostPort=0
+                    GError* close_err = nullptr;
+                    arv_device_write_register(p_device_, 0x0D00, close_val, &close_err);
+                    if (close_err)
+                    {
+                        g_error_free(close_err);
+                    }
+                    RCLCPP_INFO(logger_,
+                                "Closing channel: GevSCPHostPort 0x%04X -> 0 "
+                                "(preparing for create_stream)",
+                                d00_pre & 0xFFFF);
+                    // Wait briefly for the camera to close the channel
+                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                }
+            }
+
             stream.p_arv_stream = arv_camera_create_stream(p_camera_, nullptr, nullptr, err.ref());
             CHECK_GERROR_MSG(err, logger_, "In creating camera stream.");
+
+            // Read and verify GevSCPS (0x0D04) after create_stream
+            if (arv_camera_is_gv_device(p_camera_) && stream.p_arv_stream)
+            {
+                guint32 scps_post = 0;
+                GError* post_err  = nullptr;
+                arv_device_read_register(p_device_, 0x0D04, &scps_post, &post_err);
+                if (post_err)
+                {
+                    g_error_free(post_err);
+                }
+                RCLCPP_INFO(logger_,
+                            "GevSCPS post-create_stream: R[0x0D04]=0x%08X "
+                            "(FiringEnable=%u PacketSize=%u)",
+                            scps_post, (scps_post >> 31) & 1, scps_post & 0xFFFF);
+            }
 
             if (stream.p_arv_stream)
             {
                 //--- Initialize buffers
 
                 // stream payload size in bytes
-                const auto STREAM_PAYLOAD_SIZE = arv_camera_get_payload(p_camera_, err.ref());
+                auto STREAM_PAYLOAD_SIZE = arv_camera_get_payload(p_camera_, err.ref());
                 CHECK_GERROR_MSG(err, logger_, "In getting payload size of stream.");
+                if (STREAM_PAYLOAD_SIZE > 100000000)
+                {
+                    const auto fallback_size =
+                      static_cast<guint64>(stream.image_roi.width) *
+                      static_cast<guint64>(stream.image_roi.height) *
+                      static_cast<guint64>(stream.sensor.n_bits_pixel) / 8;
+                    RCLCPP_WARN(logger_,
+                                "Payload size %lu looks wrong (BigEndian?), "
+                                "fallback to %lu (%ix%ix%zu/8)",
+                                static_cast<unsigned long>(STREAM_PAYLOAD_SIZE),
+                                static_cast<unsigned long>(fallback_size),
+                                stream.image_roi.width, stream.image_roi.height,
+                                stream.sensor.n_bits_pixel);
+                    STREAM_PAYLOAD_SIZE = fallback_size;
+                }
 
                 // TODO: launch parameter for number of preallocated buffers
                 stream.p_buffer_pool.reset(
@@ -1678,6 +1972,348 @@ void CameraDriver::spawnCameraStreams()
                   std::thread(&CameraDriver::processStreamBuffer, this, i);
 
                 tuneArvStream(reinterpret_cast<ArvStream*>(stream.p_arv_stream));
+
+                // BigEndian workaround: force correct GevSCDA and GevSCPHostPort
+                if (arv_camera_is_gv_device(p_camera_))
+                {
+                    // Get local interface IP that aravis is using for control connection
+                    GSocketAddress* iface_sock_addr =
+                      arv_gv_device_get_interface_address(ARV_GV_DEVICE(p_device_));
+                    guint32 local_ip = 0;
+                    if (iface_sock_addr && G_IS_INET_SOCKET_ADDRESS(iface_sock_addr))
+                    {
+                        GInetAddress* inet_a =
+                          g_inet_socket_address_get_address(
+                            G_INET_SOCKET_ADDRESS(iface_sock_addr));
+                        if (inet_a && g_inet_address_get_family(inet_a) == G_SOCKET_FAMILY_IPV4)
+                        {
+                            const guint8* b = g_inet_address_to_bytes(inet_a);
+                            local_ip        = ((guint32)b[0] << 24) | ((guint32)b[1] << 16) |
+                                       ((guint32)b[2] << 8) | (guint32)b[3];
+                        }
+                    }
+
+                    // Get the stream receive port that aravis actually bound
+                    guint16 stream_port = 0;
+                    if (ARV_IS_GV_STREAM(stream.p_arv_stream))
+                        stream_port = arv_gv_stream_get_port(
+                          ARV_GV_STREAM(stream.p_arv_stream));
+
+                    // Read the initial GevSCDA/GevSCPHostPort values set by aravis (diagnostic)
+                    gint64 cam_scda_before = arv_device_get_integer_feature_value(
+                      p_device_, "GevSCDA", nullptr);
+                    gint64 cam_port_before = arv_device_get_integer_feature_value(
+                      p_device_, "GevSCPHostPort", nullptr);
+
+                    RCLCPP_INFO(logger_,
+                                "BigEndian workaround: aravis_if=%u.%u.%u.%u "
+                                "aravis_socket_port=%u "
+                                "aravis_set_GevSCDA=%lu.%lu.%lu.%lu(0x%08lX) "
+                                "cam_GevSCPHostPort=%ld",
+                                (local_ip >> 24) & 0xFF, (local_ip >> 16) & 0xFF,
+                                (local_ip >> 8) & 0xFF, local_ip & 0xFF,
+                                stream_port,
+                                (cam_scda_before >> 24) & 0xFF, (cam_scda_before >> 16) & 0xFF,
+                                (cam_scda_before >> 8) & 0xFF, cam_scda_before & 0xFF,
+                                (gulong)cam_scda_before,
+                                cam_port_before);
+
+                    // Re-select channel i before writing GevSCDA/GevSCPHostPort, as
+                    // arv_camera_create_stream() may change the channel selector internally
+                    {
+                        GError* sel_err = nullptr;
+                        arv_camera_gv_select_stream_channel(p_camera_, i, &sel_err);
+                        if (sel_err)
+                        {
+                            RCLCPP_WARN(logger_,
+                                        "GevStreamChannelSelector=%u re-select failed: %s",
+                                        i, sel_err->message);
+                            g_error_free(sel_err);
+                        }
+                        else
+                        {
+                            gint64 sel_rb = arv_device_get_integer_feature_value(
+                              p_device_, "GevStreamChannelSelector", nullptr);
+                            RCLCPP_INFO(logger_,
+                                        "GevStreamChannelSelector re-selected: %u (readback=%ld)",
+                                        i, sel_rb);
+                        }
+                    }
+
+                    // GevSCCFGUnconditionalStreaming=1 (0x0D24 bit30)
+                    // Prevent the camera from stopping the stream even on ICMP errors
+                    // (which can occur when a wrong GevSCDA destination is temporarily set)
+                    {
+                        guint32 scfg_cur  = 0;
+                        GError* scfg_rerr = nullptr;
+                        arv_device_read_register(p_device_, 0x0D24, &scfg_cur, &scfg_rerr);
+                        if (scfg_rerr)
+                        {
+                            g_error_free(scfg_rerr);
+                        }
+                        guint32 scfg_new  = scfg_cur | (1u << 30);
+                        GError* scfg_werr = nullptr;
+                        arv_device_write_register(p_device_, 0x0D24, scfg_new, &scfg_werr);
+                        if (scfg_werr)
+                        {
+                            RCLCPP_WARN(logger_,
+                                        "GevSCCFGUnconditionalStreaming write error: %s",
+                                        scfg_werr->message);
+                            g_error_free(scfg_werr);
+                        }
+                        else
+                        {
+                            guint32 scfg_rb = 0;
+                            arv_device_read_register(p_device_, 0x0D24, &scfg_rb, nullptr);
+                            RCLCPP_INFO(logger_,
+                                        "GevSCCFGUnconditionalStreaming: "
+                                        "R[0x0D24] 0x%08X→0x%08X (bit30=%u)",
+                                        scfg_cur, scfg_rb, (scfg_rb >> 30) & 1);
+                        }
+                    }
+
+                    // Force-write GevSCDA
+                    // GenICam writes may be silently rejected when TLParamsLocked is set,
+                    // so bypass it via raw register write to 0x0D18
+                    {
+                        // raw write: directly write register regardless of TLParamsLocked
+                        GError* wr_err = nullptr;
+                        arv_device_write_register(p_device_, 0x0D18, local_ip, &wr_err);
+                        if (wr_err)
+                        {
+                            RCLCPP_WARN(logger_,
+                                        "GevSCDA raw write error: %s",
+                                        wr_err->message);
+                            g_error_free(wr_err);
+                        }
+
+                        // Verify via raw readback (detect silent failures via GError)
+                        guint32 scda_rb1 = 0;
+                        GError* rb1_err  = nullptr;
+                        arv_device_read_register(p_device_, 0x0D18, &scda_rb1, &rb1_err);
+                        if (rb1_err)
+                        {
+                            RCLCPP_WARN(logger_,
+                                        "GevSCDA raw read error: %s",
+                                        rb1_err->message);
+                            g_error_free(rb1_err);
+                        }
+
+                        if (scda_rb1 == local_ip)
+                        {
+                            RCLCPP_INFO(logger_,
+                                        "GevSCDA raw write: OK "
+                                        "R[0x0D18]=0x%08X(%u.%u.%u.%u)",
+                                        scda_rb1,
+                                        (scda_rb1 >> 24) & 0xFF, (scda_rb1 >> 16) & 0xFF,
+                                        (scda_rb1 >> 8) & 0xFF, scda_rb1 & 0xFF);
+                        }
+                        else
+                        {
+                            RCLCPP_WARN(logger_,
+                                        "GevSCDA raw write MISMATCH: "
+                                        "expected=0x%08X got=0x%08X, "
+                                        "attempting byte-swap...",
+                                        local_ip, scda_rb1);
+                            // Attempt byte-swap: handle case where camera stores value in little-endian
+                            guint32 bswap_ip = __builtin_bswap32(local_ip);
+                            GError* bw_err   = nullptr;
+                            arv_device_write_register(p_device_, 0x0D18, bswap_ip, &bw_err);
+                            if (bw_err)
+                            {
+                                RCLCPP_WARN(logger_,
+                                            "GevSCDA bswap write error: %s",
+                                            bw_err->message);
+                                g_error_free(bw_err);
+                            }
+                            guint32 scda_rb2 = 0;
+                            GError* rb2_err  = nullptr;
+                            arv_device_read_register(p_device_, 0x0D18, &scda_rb2, &rb2_err);
+                            if (rb2_err)
+                            {
+                                RCLCPP_WARN(logger_, "GevSCDA bswap read error: %s",
+                                            rb2_err->message);
+                                g_error_free(rb2_err);
+                            }
+                            RCLCPP_INFO(logger_,
+                                        "GevSCDA after byte-swap: "
+                                        "R[0x0D18]=0x%08X(%u.%u.%u.%u) "
+                                        "bswap_val=0x%08X %s",
+                                        scda_rb2,
+                                        (scda_rb2 >> 24) & 0xFF, (scda_rb2 >> 16) & 0xFF,
+                                        (scda_rb2 >> 8) & 0xFF, scda_rb2 & 0xFF,
+                                        bswap_ip,
+                                        (scda_rb2 == local_ip) ? "MATCH" : (scda_rb2 == bswap_ip) ? "BSWAP_MATCH"
+                                                                                                  : "MISMATCH ***");
+                        }
+                    }
+
+                    // Write GevSCPHostPort
+                    // XML: GevSCPHostPortReg @ 0x0D00, BigEndian MSB=16 LSB=31
+                    //   -> standard bits[15:0] (lower 16 bits) hold GevSCPHostPort
+                    // Note: previous bug wrote stream_port<<16 to upper 16 bits,
+                    //   which corrupted GevSCPInterfaceIndex (Min=0,Max=0) causing invalid-parameter
+                    if (stream_port > 0)
+                    {
+                        // First attempt via GenICam feature
+                        GError* port_err = nullptr;
+                        arv_device_set_integer_feature_value(
+                          p_device_, "GevSCPHostPort", (gint64)stream_port, &port_err);
+                        if (port_err)
+                        {
+                            RCLCPP_WARN(logger_,
+                                        "GevSCPHostPort GenICam write failed (%s), "
+                                        "falling back to raw write at 0x0D00 "
+                                        "(set port in bits[15:0])",
+                                        port_err->message);
+                            g_error_free(port_err);
+
+                            // 0x0D00 layout (BigEndian):
+                            //   bits[31:20]: reserved/zero
+                            //   bits[19:16]: GevSCPInterfaceIndex (Max=0, must stay 0)
+                            //   bits[15:0]:  GevSCPHostPort <- write here
+                            guint32 scps_cur = 0;
+                            GError* rerr     = nullptr;
+                            arv_device_read_register(p_device_, 0x0D00, &scps_cur, &rerr);
+                            if (rerr)
+                            {
+                                RCLCPP_WARN(logger_,
+                                            "0x0D00 read failed: %s, assuming upper bits=0",
+                                            rerr->message);
+                                g_error_free(rerr);
+                                scps_cur = 0;
+                            }
+                            else
+                            {
+                                RCLCPP_INFO(logger_,
+                                            "0x0D00 before write: 0x%08X "
+                                            "(InterfaceIdx=%u HostPort=%u)",
+                                            scps_cur, (scps_cur >> 16) & 0xF, scps_cur & 0xFFFF);
+                            }
+                            // Update lower 16 bits (GevSCPHostPort), preserve upper 16 bits (GevSCPInterfaceIndex etc.)
+                            guint32 new_scps = (scps_cur & 0xFFFF0000) | ((guint32)stream_port & 0xFFFF);
+                            GError* werr     = nullptr;
+                            arv_device_write_register(p_device_, 0x0D00, new_scps, &werr);
+                            if (werr)
+                            {
+                                RCLCPP_ERROR(logger_,
+                                             "0x0D00 register write failed: %s",
+                                             werr->message);
+                                g_error_free(werr);
+                            }
+                            else
+                            {
+                                guint32 rb = 0;
+                                arv_device_read_register(p_device_, 0x0D00, &rb, nullptr);
+                                RCLCPP_INFO(logger_,
+                                            "0x0D00 after write: 0x%08X "
+                                            "(InterfaceIdx=%u HostPort=%u) -> %s",
+                                            rb, (rb >> 16) & 0xF, rb & 0xFFFF,
+                                            ((rb & 0xFFFF) == (guint32)stream_port)
+                                              ? "OK"
+                                              : "MISMATCH ***");
+                            }
+                        }
+                    }
+
+                    // Toggle GevSCPSFiringEnable (0->1) to re-latch GevSCDA
+                    // The camera reads the current GevSCDA when FiringEnable transitions to 1
+                    {
+                        guint32 scps_cur  = 0;
+                        GError* scps_rerr = nullptr;
+                        arv_device_read_register(p_device_, 0x0D04, &scps_cur, &scps_rerr);
+                        if (scps_rerr)
+                        {
+                            g_error_free(scps_rerr);
+                        }
+                        RCLCPP_INFO(logger_,
+                                    "GevSCPS before FiringEnable toggle: "
+                                    "R[0x0D04]=0x%08X (FiringEnable=%u PacketSize=%u)",
+                                    scps_cur, (scps_cur >> 31) & 1, scps_cur & 0xFFFF);
+
+                        // Step 1: Clear FiringEnable to 0
+                        guint32 scps_off = scps_cur & ~(1u << 31);
+                        GError* off_err  = nullptr;
+                        arv_device_write_register(p_device_, 0x0D04, scps_off, &off_err);
+                        if (off_err)
+                        {
+                            g_error_free(off_err);
+                        }
+
+                        // Step 2: Re-write GevSCDA with correct IP (re-confirm for latch update)
+                        GError* rewr_err = nullptr;
+                        arv_device_write_register(p_device_, 0x0D18, local_ip, &rewr_err);
+                        if (rewr_err)
+                        {
+                            g_error_free(rewr_err);
+                        }
+
+                        // Step 3: Assert FiringEnable to 1
+                        guint32 scps_on = scps_off | (1u << 31);
+                        GError* on_err  = nullptr;
+                        arv_device_write_register(p_device_, 0x0D04, scps_on, &on_err);
+                        if (on_err)
+                        {
+                            RCLCPP_WARN(logger_,
+                                        "GevSCPSFiringEnable write error: %s",
+                                        on_err->message);
+                            g_error_free(on_err);
+                        }
+                        else
+                        {
+                            guint32 scps_rb = 0;
+                            arv_device_read_register(p_device_, 0x0D04, &scps_rb, nullptr);
+                            RCLCPP_INFO(logger_,
+                                        "GevSCPSFiringEnable: R[0x0D04] "
+                                        "0x%08X→0x%08X (bit31=%u) %s",
+                                        scps_cur, scps_rb, (scps_rb >> 31) & 1,
+                                        ((scps_rb >> 31) & 1) ? "ON" : "REJECTED ***");
+                        }
+                    }
+
+                    // Final verification log (re-select channel to read accurately)
+                    {
+                        GError* fv_sel_err = nullptr;
+                        arv_camera_gv_select_stream_channel(p_camera_, i, &fv_sel_err);
+                        if (fv_sel_err)
+                        {
+                            RCLCPP_WARN(logger_,
+                                        "final verify: channel %u re-select failed: %s",
+                                        i, fv_sel_err->message);
+                            g_error_free(fv_sel_err);
+                        }
+                    }
+                    // Verify GevSCDA via raw register read (bypass GenICam cache)
+                    guint32 scda_raw_final = 0;
+                    GError* fv_err         = nullptr;
+                    arv_device_read_register(p_device_, 0x0D18, &scda_raw_final, &fv_err);
+                    if (fv_err)
+                    {
+                        RCLCPP_WARN(logger_, "final verify raw read error: %s", fv_err->message);
+                        g_error_free(fv_err);
+                    }
+                    // Verify GevSCPHostPort via raw register read (bits[15:0] of 0x0D00)
+                    guint32 port_reg_raw = 0;
+                    GError* port_fv_err  = nullptr;
+                    arv_device_read_register(p_device_, 0x0D00, &port_reg_raw, &port_fv_err);
+                    if (port_fv_err)
+                    {
+                        g_error_free(port_fv_err);
+                    }
+                    guint32 port_rb_raw = port_reg_raw & 0xFFFF;  // GevSCPHostPort = bits[15:0]
+                    RCLCPP_INFO(logger_,
+                                "Stream ch final verify: "
+                                "GevSCDA=0x%08X(%u.%u.%u.%u) "
+                                "GevSCPHostPort=%u(R[0x0D00]=0x%08X) "
+                                "aravis_socket_port=%u "
+                                "scda_match=%s port_match=%s",
+                                scda_raw_final,
+                                (scda_raw_final >> 24) & 0xFF, (scda_raw_final >> 16) & 0xFF,
+                                (scda_raw_final >> 8) & 0xFF, scda_raw_final & 0xFF,
+                                port_rb_raw, port_reg_raw, stream_port,
+                                (scda_raw_final == local_ip) ? "OK" : "MISMATCH ***",
+                                (port_rb_raw == (guint32)stream_port) ? "YES" : "NO ***");
+                }
 
                 num_opened_streams++;
                 break;
@@ -1748,8 +2384,102 @@ void CameraDriver::spawnCameraStreams()
     {
         RCLCPP_INFO(logger_, "|-> Acquisition start at initialization.");
 
+        // BigEndian workaround: write ExposureTime raw (10000us / 10 = 1000) to reg 0x13020
+        {
+            const guint32 exp_raw = 1000;  // 10000 us / 10 (converter FormulaFrom: TO/10)
+            GError* exp_reg_err   = nullptr;
+            arv_device_write_register(p_device_, 0x13020, exp_raw, &exp_reg_err);
+            guint32 exp_rb = 0xFFFF;
+            arv_device_read_register(p_device_, 0x13020, &exp_rb, nullptr);
+            if (!exp_reg_err)
+                RCLCPP_INFO(logger_, "ExposureTimeRaw 0x13020 write: %u (10000us), readback=0x%08X",
+                            exp_raw, exp_rb);
+            else
+            {
+                RCLCPP_WARN(logger_, "ExposureTimeRaw 0x13020 write failed.");
+                g_error_free(exp_reg_err);
+            }
+        }
+        // BigEndian workaround: final checks and settings before AcquisitionStart
+        if (arv_camera_is_gv_device(p_camera_))
+        {
+            // 1. If GevSCPHostPort (lower 16 bits of 0x0D00) is 0, re-write it to open the channel
+            //    GigE Vision v1.x: GevSCPHostPort != 0 -> FiringEnable auto ON
+            {
+                guint32 d00_val = 0;
+                arv_device_read_register(p_device_, 0x0D00, &d00_val, nullptr);
+                guint16 host_port = d00_val & 0xFFFF;
+                RCLCPP_INFO(logger_,
+                            "Pre-AcqStart: R[0x0D00]=0x%08X (InterfaceIdx=%u HostPort=%u)",
+                            d00_val, (d00_val >> 16) & 0xF, host_port);
+
+                if (host_port == 0 && !streams_.empty() &&
+                    streams_[0].p_arv_stream &&
+                    ARV_IS_GV_STREAM(streams_[0].p_arv_stream))
+                {
+                    guint16 sp = arv_gv_stream_get_port(
+                      ARV_GV_STREAM(streams_[0].p_arv_stream));
+                    guint32 new_val = (d00_val & 0xFFFF0000) | (guint32)sp;
+                    GError* hp_err  = nullptr;
+                    arv_device_write_register(p_device_, 0x0D00, new_val, &hp_err);
+                    if (hp_err)
+                    {
+                        RCLCPP_WARN(logger_,
+                                    "Pre-AcqStart GevSCPHostPort re-write failed: %s",
+                                    hp_err->message);
+                        g_error_free(hp_err);
+                    }
+                    else
+                    {
+                        guint32 rb = 0;
+                        arv_device_read_register(p_device_, 0x0D00, &rb, nullptr);
+                        RCLCPP_INFO(logger_,
+                                    "Pre-AcqStart GevSCPHostPort: "
+                                    "R[0x0D00] 0x%08X->0x%08X (HostPort=%u) -> FiringEnable auto ON",
+                                    d00_val, rb, rb & 0xFFFF);
+                    }
+                }
+            }
+
+            // 2. Force AcquisitionMode = Continuous (0x13100 = 0) via raw register write
+            {
+                GError* am_err = nullptr;
+                arv_device_write_register(p_device_, 0x13100, 0, &am_err);
+                if (am_err)
+                {
+                    RCLCPP_WARN(logger_, "AcquisitionMode Continuous raw write failed: %s",
+                                am_err->message);
+                    g_error_free(am_err);
+                }
+                else
+                {
+                    guint32 am_rb = 0;
+                    arv_device_read_register(p_device_, 0x13100, &am_rb, nullptr);
+                    RCLCPP_INFO(logger_, "AcquisitionMode raw write: 0x13100=0x%08X (0=Continuous)",
+                                am_rb);
+                }
+            }
+
+            // 3. Final state verification log
+            {
+                guint32 d04 = 0, d00 = 0, d18 = 0;
+                arv_device_read_register(p_device_, 0x0D00, &d00, nullptr);
+                arv_device_read_register(p_device_, 0x0D04, &d04, nullptr);
+                arv_device_read_register(p_device_, 0x0D18, &d18, nullptr);
+                RCLCPP_INFO(logger_,
+                            "Pre-AcqStart final: "
+                            "R[0x0D00]=0x%08X(HostPort=%u) "
+                            "R[0x0D04]=0x%08X(bit31=%u) "
+                            "R[0x0D18]=0x%08X(GevSCDA=%u.%u.%u.%u)",
+                            d00, d00 & 0xFFFF,
+                            d04, (d04 >> 31) & 1,
+                            d18, (d18 >> 24) & 0xFF, (d18 >> 16) & 0xFF, (d18 >> 8) & 0xFF, d18 & 0xFF);
+            }
+        }
+
         arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
         CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
+        RCLCPP_INFO(logger_, "AcquisitionStart command executed.");
     }
 
     this->is_initialized_ = true;

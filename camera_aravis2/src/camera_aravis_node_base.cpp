@@ -158,6 +158,7 @@ void CameraAravisNodeBase::setupParameters()
     //--- get device pointer from camera
     p_device_ = arv_camera_get_device(p_camera_);
 
+
     //--- connect control-lost signal
     g_signal_connect(p_device_, "control-lost",
                      (GCallback)CameraAravisNodeBase::handleControlLostSignal, this);

@@ -246,8 +246,10 @@ int CameraDriverGv::discoverNumberOfStreams()
         }
     }
 
-    if (num_streams == 0 || !p_device_)
+    if (num_streams <= 0 || num_streams > 16 || !p_device_)
     {
+        if (num_streams != 0)
+            RCLCPP_WARN(logger_, "Invalid stream channel count (%i), using fallback.", num_streams);
         num_streams = 1;
         RCLCPP_INFO(logger_, "Unable to automatically detect number of supported stream channels. "
                              "Setting num_streams = %i.",
@@ -273,16 +275,24 @@ void CameraDriverGv::tuneArvStream(ArvStream* p_stream) const
         return;
     }
 
-    gboolean b_auto_buffer               = FALSE;
     gboolean b_packet_resend             = TRUE;
-    unsigned int timeout_packet          = 40;  // milliseconds
-    unsigned int timeout_frame_retention = 200;
+    unsigned int timeout_packet          = 40;    // milliseconds
+    unsigned int timeout_frame_retention = 5000;  // BigEndian workaround: long exposure may need more time
 
-    if (b_auto_buffer)
-        g_object_set(p_stream, "socket-buffer",
-                     ARV_GV_STREAM_SOCKET_BUFFER_AUTO,
-                     "socket-buffer-size", 0,
+    // BigEndian camera workaround: force a large socket buffer
+    // Default rmem_max=212992 (208 KB) is smaller than one frame (5 MB), causing frequent drops.
+    // Run: sudo sysctl -w net.core.rmem_max=16777216 beforehand
+    {
+        const int target_buf = 16 * 1024 * 1024;  // 16 MB
+        g_object_set(p_stream,
+                     "socket-buffer", ARV_GV_STREAM_SOCKET_BUFFER_FIXED,
+                     "socket-buffer-size", target_buf,
                      NULL);
+        RCLCPP_INFO(rclcpp::get_logger("camera_driver_gv"),
+                    "Attempting to set socket buffer: %d MB "
+                    "(limited to 208 KB if rmem_max is insufficient)",
+                    target_buf / (1024 * 1024));
+    }
     if (!b_packet_resend)
         g_object_set(p_stream, "packet-resend",
                      b_packet_resend
