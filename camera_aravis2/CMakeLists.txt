@@ -61,25 +61,20 @@ endif()
 
 set(LIBRARY_NAME ${PROJECT_NAME}_core)
 
-set(DEPENDENCIES
-  rclcpp
-  rclcpp_components
-  cv_bridge
-  image_transport
-  camera_info_manager
-  std_msgs
-  sensor_msgs
-  diagnostic_msgs
-  camera_aravis2_msgs
-)
-
 set(LIBRARIES
   ${ARAVIS_LIBRARIES}
   glib-2.0
   gmodule-2.0
   gobject-2.0
+  camera_aravis2_msgs::camera_aravis2_msgs
+  camera_info_manager::camera_info_manager
   cv_bridge::cv_bridge
+  diagnostic_msgs::diagnostic_msgs
   image_transport::image_transport
+  rclcpp::rclcpp
+  rclcpp_components::component
+  sensor_msgs::sensor_msgs
+  std_msgs::std_msgs
   ${YAML_CPP_LIBRARY_DIRS}
 )
 
@@ -95,7 +90,6 @@ add_library(${LIBRARY_NAME} SHARED
 )
 target_link_libraries(${LIBRARY_NAME} ${LIBRARIES})
 target_compile_definitions(${LIBRARY_NAME} PRIVATE ${COMMON_COMPILE_DEFINITIONS})
-ament_target_dependencies(${LIBRARY_NAME} ${DEPENDENCIES})
 
 # camera_driver_gv node
 
