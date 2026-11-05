@@ -752,6 +752,21 @@ void CameraDriver::filterParameterListNames(
         if (is_parameter_set)
             setFeatureValueFromParameter<std::string>(tmp_feature_name, tmp_param_value, i);
         getFeatureValue<std::string>(tmp_feature_name, acq_ctrl.exposure_mode);
+        //--- if the camera does not provide 'ExposureMode', assume 'Timed' (see #60)
+        {
+            GuardedGError err_exp_mode;
+            bool is_query_successful = true;
+            const bool is_exposure_mode_available =
+              arv_device_is_feature_available(p_device_, tmp_feature_name.c_str(),
+                                              err_exp_mode.ref());
+            CHECK_SUCCESS_GERROR(err_exp_mode, logger_, is_query_successful)
+            if (is_query_successful && !is_exposure_mode_available)
+            {
+                acq_ctrl.exposure_mode = "Timed";
+                RCLCPP_INFO(logger_, "Stream %i: '%s' is not available. Assuming 'Timed'.", i,
+                            tmp_feature_name.c_str());
+            }
+        }
         if (is_parameter_set &&
             !isParameterValueEqualTo<std::string>(tmp_param_value, acq_ctrl.exposure_mode, i))
             config_warn_msgs_.push_back("Stream " + std::to_string(i) + ": " +
