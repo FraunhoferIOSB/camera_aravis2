@@ -232,7 +232,10 @@ CameraDriverGv::~CameraDriverGv()
 //==================================================================================================
 int CameraDriverGv::discoverNumberOfStreams()
 {
-    int num_streams = 0;
+    //--- upper bound for a plausible number of stream channels (see #62)
+    constexpr int64_t MAX_NUM_STREAMS = 16;
+
+    int64_t num_streams = 0;
 
     if (p_device_)
     {
@@ -251,14 +254,22 @@ int CameraDriverGv::discoverNumberOfStreams()
         num_streams = 1;
         RCLCPP_INFO(logger_, "Unable to automatically detect number of supported stream channels. "
                              "Setting num_streams = %i.",
-                    num_streams);
+                    static_cast<int>(num_streams));
+    }
+    else if (num_streams < 0 || num_streams > MAX_NUM_STREAMS)
+    {
+        RCLCPP_WARN(logger_, "Invalid number of stream channels reported by device: %s. "
+                             "Setting num_streams = 1.",
+                    std::to_string(num_streams).c_str());
+        num_streams = 1;
     }
     else
     {
-        RCLCPP_INFO(logger_, "Number of supported stream channels: %i", num_streams);
+        RCLCPP_INFO(logger_, "Number of supported stream channels: %i",
+                    static_cast<int>(num_streams));
     }
 
-    return num_streams;
+    return static_cast<int>(num_streams);
 }
 
 //==================================================================================================
