@@ -556,6 +556,9 @@ class CameraDriver : public CameraAravisNodeBase
     /// List of the specified dynamic parameter names.
     std::vector<std::string> dynamic_parameters_names_;
 
+    /// Offset in seconds added to the timestamp of the published image messages.
+    double timestamp_offset_;
+
     /// Atomic flag, indicating if diagnostics are published.
     std::atomic<bool> is_diagnostics_published_;
 

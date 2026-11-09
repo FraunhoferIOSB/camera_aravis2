@@ -49,6 +49,7 @@ CameraDriver::CameraDriver(const std::string& name, const rclcpp::NodeOptions& o
   is_spawning_(false),
   p_white_balance_srv_(nullptr),
   p_parameter_callback_handle_(nullptr),
+  timestamp_offset_(0.0),
   is_diagnostics_published_(false),
   p_diagnostic_pub_(nullptr),
   current_num_subscribers_(0)
@@ -136,6 +137,12 @@ void CameraDriver::setupParameters()
     verbose_desc.description =
       "Activate verbose output.";
     declare_parameter<bool>("verbose", false, verbose_desc);
+
+    auto timestamp_offset_desc = rcl_interfaces::msg::ParameterDescriptor{};
+    timestamp_offset_desc.description =
+      "Offset in seconds added to the timestamp of the published image messages.";
+    declare_parameter<double>("timestamp_offset", 0.0, timestamp_offset_desc);
+    timestamp_offset_ = get_parameter("timestamp_offset").as_double();
 
     //--- register parameter change callback
     p_parameter_callback_handle_ = add_on_set_parameters_callback(
@@ -1356,6 +1363,11 @@ rcl_interfaces::msg::SetParametersResult CameraDriver::handleDynamicParameterCha
         {
             is_verbose_enable_ = param.as_bool();
         }
+        //--- timestamp offset
+        else if (param_name == "timestamp_offset")
+        {
+            timestamp_offset_ = param.as_double();
+        }
         //--- dynamic camera parameters, check if parameter name is in list of specified dynamic
         //--- parameters
         else if (std::find(dynamic_parameters_names_.begin(), dynamic_parameters_names_.end(),
@@ -1866,6 +1878,10 @@ void CameraDriver::fillImageMsgMetadata(sensor_msgs::msg::Image::SharedPtr& p_im
 
     if (!isBufferTimestampSet)
         p_img_msg->header.stamp = rclcpp::Time(arv_buffer_get_system_timestamp(p_buffer));
+
+    //--- apply timestamp offset
+    p_img_msg->header.stamp = rclcpp::Time(p_img_msg->header.stamp) +
+                              rclcpp::Duration::from_seconds(timestamp_offset_);
     p_img_msg->header.frame_id = sensor.frame_id;
 
     //--- fill image meta data

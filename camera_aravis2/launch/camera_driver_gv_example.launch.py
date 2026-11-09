@@ -65,6 +65,7 @@ def generate_launch_description():
                         get_package_share_directory('camera_aravis2'),
                         'config/camera_diagnostics_example.yaml'),
                     'verbose': False,
+                    'timestamp_offset': 0.0,
 
                     # GenICam-specific parameters
                     'DeviceControl': {
