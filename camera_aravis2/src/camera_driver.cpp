@@ -1113,7 +1113,7 @@ bool CameraDriver::initializeServices()
 
 #ifdef WITH_MATCHED_EVENTS
 //==================================================================================================
-void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventInfo)
+void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& /*iEventInfo*/)
 {
     GuardedGError err;
 
@@ -1121,39 +1121,41 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& iEventIn
     //--- node is initialized.
     if (p_device_ && this->is_initialized_)
     {
-        //--- if the new subscriber count of the matched event is greater than 0 and if there were
-        //--- no subscriber so far, start acquisition
-        if (iEventInfo.current_count > 0 && current_num_subscribers_ == 0)
+        //--- get the maximum number of subscribers over all streams. Each camera publisher already
+        //--- counts the subscribers of all its transports (e.g. raw and compressed). The matched
+        //--- event count must not be used, since it refers to one transport only.
+        int new_num_subscribers = 0;
+        for (uint i = 0; i < streams_.size(); ++i)
+        {
+            new_num_subscribers =
+              std::max(static_cast<int>(streams_[i].camera_pub.getNumSubscribers()),
+                       new_num_subscribers);
+        }
+
+        //--- if there are subscribers now and there were none before, start acquisition
+        if (new_num_subscribers > 0 && current_num_subscribers_ == 0)
         {
             RCLCPP_INFO(logger_, "|-> Acquisition start.");
 
             arv_device_execute_command(p_device_, "AcquisitionStart", err.ref());
             CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStart'.");
         }
-        //--- if the new subscriber count of the matched event is equal to 0 and if there were
-        //--- subscribers until now, stop acquisition
-        else if (iEventInfo.current_count == 0 && current_num_subscribers_ > 0)
+        //--- if there are no subscribers now and there were subscribers before, stop
+        //--- acquisition
+        else if (new_num_subscribers == 0 && current_num_subscribers_ > 0)
         {
             RCLCPP_INFO(logger_, "->| Acquisition stop.");
 
             arv_device_execute_command(p_device_, "AcquisitionStop", err.ref());
             CHECK_GERROR_MSG(err, logger_, "In executing 'AcquisitionStop'.");
         }
+
+        current_num_subscribers_ = new_num_subscribers;
     }
     else
     {
         RCLCPP_WARN(logger_, "Subscription change detected but no action taken. "
                              "Reason: p_device_ is NULL or node is not initialized.");
-        return;
-    }
-
-    //--- get the maximum number of subscribers over all streams and assign to the member variable
-    current_num_subscribers_ = 0;
-    for (uint i = 0; i < streams_.size(); ++i)
-    {
-        current_num_subscribers_ =
-          std::max(static_cast<int>(streams_[i].camera_pub.getNumSubscribers()),
-                   current_num_subscribers_);
     }
 }
 #endif
