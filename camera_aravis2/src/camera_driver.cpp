@@ -29,6 +29,7 @@
 #include "camera_aravis2/camera_driver.h"
 
 // ROS
+#include <image_transport/camera_common.hpp>
 #include <rcl_interfaces/msg/floating_point_range.hpp>
 #include <rcl_interfaces/msg/integer_range.hpp>
 #include <rclcpp/time.hpp>
@@ -248,17 +249,22 @@ bool CameraDriver::setupCameraStreamStructs()
             topic_name += "/" + stream.name;
         topic_name += "/image_raw";
 
-#ifndef WITH_MATCHED_EVENTS
-        stream.camera_pub = image_transport::create_camera_publisher(this, topic_name);
-#else
         rclcpp::PublisherOptions pub_options;
+#ifndef WITH_MATCHED_EVENTS
+        stream.image_pub = image_transport::create_publisher(this, topic_name);
+#else
         pub_options.event_callbacks.matched_callback =
           std::bind(&CameraDriver::handleMessageSubscriptionChange, this,
                     std::placeholders::_1);
-        stream.camera_pub =
-          image_transport::create_camera_publisher(this, topic_name,
-                                                   rmw_qos_profile_default, pub_options);
+        stream.image_pub =
+          image_transport::create_publisher(this, topic_name,
+                                            rmw_qos_profile_default, pub_options);
 #endif
+
+        //--- camera_info is published by a separate publisher, so that its subscribers trigger
+        //--- the matched event as well. The image_transport::CameraPublisher does not support that.
+        stream.p_camera_info_pub = this->create_publisher<sensor_msgs::msg::CameraInfo>(
+          image_transport::getCameraInfoTopic(stream.image_pub.getTopic()), 10, pub_options);
 
         //--- initialize camera_info manager
         // NOTE: Previously, separate node handles where used for CameraInfoManagers in case of a
@@ -1121,15 +1127,17 @@ void CameraDriver::handleMessageSubscriptionChange(rclcpp::MatchedInfo& /*iEvent
     //--- node is initialized.
     if (p_device_ && this->is_initialized_)
     {
-        //--- get the maximum number of subscribers over all streams. Each camera publisher already
-        //--- counts the subscribers of all its transports (e.g. raw and compressed). The matched
-        //--- event count must not be used, since it refers to one transport only.
+        //--- get the maximum number of image and camera_info subscribers over all streams. Each
+        //--- image publisher already counts the subscribers of all its transports (e.g. raw and
+        //--- compressed). The matched event count must not be used, since it refers to one
+        //--- publisher only.
         int new_num_subscribers = 0;
         for (uint i = 0; i < streams_.size(); ++i)
         {
             new_num_subscribers =
-              std::max(static_cast<int>(streams_[i].camera_pub.getNumSubscribers()),
-                       new_num_subscribers);
+              std::max({static_cast<int>(streams_[i].image_pub.getNumSubscribers()),
+                        static_cast<int>(streams_[i].p_camera_info_pub->get_subscription_count()),
+                        new_num_subscribers});
         }
 
         //--- if there are subscribers now and there were none before, start acquisition
@@ -1833,7 +1841,8 @@ void CameraDriver::processStreamBuffer(const uint stream_id)
         fillCameraInfoMsg(stream, p_img_msg);
 
         //--- publish
-        stream.camera_pub.publish(p_img_msg, stream.p_cam_info_msg);
+        stream.image_pub.publish(*p_img_msg);
+        stream.p_camera_info_pub->publish(*stream.p_cam_info_msg);
 
         //--- do post frame processing
         postFrameProcessingCallback(stream_id);
@@ -2007,7 +2016,9 @@ void CameraDriver::printCameraConfiguration() const
         {
             RCLCPP_INFO(logger_, "    Camera Info:         %s", STREAM.camera_info_url.c_str());
             RCLCPP_INFO(logger_, "    Topic:               %s",
-                        STREAM.camera_pub.getTopic().c_str());
+                        STREAM.image_pub.getTopic().c_str());
+            RCLCPP_INFO(logger_, "    Camera Info Topic:   %s",
+                        STREAM.p_camera_info_pub->get_topic_name());
             RCLCPP_INFO(logger_, "    Frame ID:            %s", SENSOR.frame_id.c_str());
         }
 

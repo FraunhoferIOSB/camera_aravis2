@@ -121,8 +121,11 @@ class CameraDriver : public CameraAravisNodeBase
         /// Conversion function to convert pixel format from sensor into image message.
         ConversionFunction cvt_pixel_format;
 
-        /// Camera publisher.
-        image_transport::CameraPublisher camera_pub;
+        /// Image publisher.
+        image_transport::Publisher image_pub;
+
+        /// Camera info publisher.
+        rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr p_camera_info_pub;
 
         /// Unique pointer to camera info manager.
         std::unique_ptr<camera_info_manager::CameraInfoManager> p_camera_info_manager;
