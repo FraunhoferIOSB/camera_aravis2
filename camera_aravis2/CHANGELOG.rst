@@ -2,8 +2,8 @@
 Changelog for package camera_aravis2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.3.0 (2026-11-26)
+------------------
 * feat: add timestamp_offset parameter to shift image and camera_info timestamps
 * fix: keep acquisition running while subscribers of any image transport are connected (#71)
 * fix: start and stop acquisition also for camera_info subscribers
