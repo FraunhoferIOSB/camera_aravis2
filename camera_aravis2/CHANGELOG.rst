@@ -2,6 +2,17 @@
 Changelog for package camera_aravis2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* feat: add timestamp_offset parameter to shift image and camera_info timestamps
+* fix: keep acquisition running while subscribers of any image transport are connected (#71)
+* fix: start and stop acquisition also for camera_info subscribers
+* fix: consider subscribers that connect during initialization
+* fix: assume ExposureMode 'Timed' if the feature is not available (#60)
+* fix: add sanity check for the number of streams (#62)
+* refactor: modernize CMake and use pkg-config as hint to find aravis
+* Contributors: Ethan J. Musser, José Maravalhas Silva, Michal Sojka, Miguel Granero, sumihiro6
+
 1.2.0 (2026-03-09)
 ------------------
 * other: add miguel as maintainer
